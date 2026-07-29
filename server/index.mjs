@@ -2,6 +2,7 @@ import http from 'node:http';
 import { readFile, writeFile, mkdir, stat, unlink } from 'node:fs/promises';
 import { createReadStream } from 'node:fs';
 import { resolve, extname, join, normalize } from 'node:path';
+import { tmpdir } from 'node:os';
 import { randomBytes, scryptSync, timingSafeEqual, randomUUID } from 'node:crypto';
 import { products, categories, banners } from '../src/data/products.js';
 import { news } from '../src/data/news.js';
@@ -14,8 +15,8 @@ if (process.env.NODE_ENV !== 'production') {
   allowedOrigins.add('http://localhost:5173');
   allowedOrigins.add('http://127.0.0.1:5173');
 }
-const DATA_FILE = resolve(process.env.DATA_FILE || './data/database.json');
-const UPLOAD_DIR = resolve(process.env.UPLOAD_DIR || './uploads');
+let DATA_FILE = resolve(process.env.DATA_FILE || './data/database.json');
+let UPLOAD_DIR = resolve(process.env.UPLOAD_DIR || './uploads');
 const DIST_DIR = resolve('./dist');
 const sessions = new Map();
 const attempts = new Map();
@@ -26,8 +27,17 @@ const legalDefaults = [
   ['sales', 'Условия продажи, возврата и гарантии'],
 ];
 
-await mkdir(resolve(DATA_FILE, '..'), { recursive: true });
-await mkdir(UPLOAD_DIR, { recursive: true });
+try {
+  await mkdir(resolve(DATA_FILE, '..'), { recursive: true });
+  await mkdir(UPLOAD_DIR, { recursive: true });
+} catch (error) {
+  if (error?.code !== 'EACCES' || process.env.DATA_FILE || process.env.UPLOAD_DIR) throw error;
+  const writableRoot = join(tmpdir(), 'macluck');
+  DATA_FILE = join(writableRoot, 'database.json');
+  UPLOAD_DIR = join(writableRoot, 'uploads');
+  await mkdir(UPLOAD_DIR, { recursive: true });
+  console.warn(`Read-only application directory detected; using temporary storage at ${writableRoot}`);
+}
 let db = await loadDatabase();
 
 function loadEnv(path) {

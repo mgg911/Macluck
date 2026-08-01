@@ -269,7 +269,14 @@ async function route(req, res) {
   }
   if (!path.startsWith('/api/')) return serveStatic(path, res);
   if (!isAdmin(req)) return json(res, 401, { error: 'Требуется авторизация' });
-  if (path === '/api/admin/snapshot' && req.method === 'GET') return json(res, 200, db);
+  if (path === '/api/admin/snapshot' && req.method === 'GET') {
+    return json(res, 200, {
+      ...db,
+      system: {
+        telegramConfigured: Boolean(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID),
+      },
+    });
+  }
   if (path === '/api/admin/settings' && req.method === 'PUT') {
     db.settings = { ...db.settings, ...cleanRecord(await body(req)) }; await save(); return json(res, 200, db.settings);
   }

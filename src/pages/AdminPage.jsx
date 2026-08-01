@@ -45,6 +45,20 @@ function Editor({ section, value, onClose, onSaved }) {
   const [text, setText] = useState(JSON.stringify(value, null, 2));
   const [error, setError] = useState('');
   const [uploading, setUploading] = useState(false);
+  const updateField = (field, nextValue) => {
+    try {
+      const parsed = JSON.parse(text);
+      parsed[field] = nextValue;
+      setText(JSON.stringify(parsed, null, 2));
+      setError('');
+    } catch {
+      setError('Сначала исправьте JSON, затем измените поле');
+    }
+  };
+  let bannerLink = '';
+  if (section === 'banners') {
+    try { bannerLink = JSON.parse(text).link || ''; } catch {}
+  }
   const save = async () => {
     try {
       const parsed = JSON.parse(text);
@@ -84,6 +98,17 @@ function Editor({ section, value, onClose, onSaved }) {
       <h2 className="text-xl font-bold mb-3">{value.id ? 'Редактирование' : 'Новая запись'}</h2>
       <p className="text-sm text-gray-500 mb-3">Поля представлены в JSON: строки — в кавычках, списки — в квадратных скобках.</p>
       {error && <p className="bg-red-50 text-red-700 p-3 rounded-lg mb-3">{error}</p>}
+      {section === 'banners' && <label className="block mb-3 text-sm font-medium">
+        Ссылка при нажатии на баннер
+        <input
+          type="text"
+          value={bannerLink}
+          onChange={(event) => updateField('link', event.target.value)}
+          placeholder="/brand/iphone или /product/iphone-17-pro-max"
+          className="mt-1 w-full border rounded-lg px-3 py-2 font-normal"
+        />
+        <span className="block mt-1 text-xs text-gray-500">Категория: /brand/iphone · товар: /product/iphone-17-pro-max · весь каталог: /catalog</span>
+      </label>}
       <textarea aria-label="Данные записи" value={text} onChange={e => setText(e.target.value)} className="w-full h-96 font-mono text-sm border rounded-xl p-3" />
       {['products', 'news', 'banners'].includes(section) && <label className="block mt-3 text-sm">
         Загрузить изображение
@@ -166,6 +191,9 @@ export default function AdminPage() {
       <button onClick={logout} className="border rounded-lg px-4 py-2">Выйти</button>
     </div>
     {error && <p className="bg-red-50 text-red-700 p-3 rounded-lg mb-4">{error}</p>}
+    {snapshot?.system && <p className={`p-3 rounded-lg mb-4 text-sm ${snapshot.system.telegramConfigured ? 'bg-green-50 text-green-800' : 'bg-amber-50 text-amber-900'}`}>
+      Telegram-уведомления: {snapshot.system.telegramConfigured ? 'настроены' : 'не настроены — добавьте TELEGRAM_BOT_TOKEN и TELEGRAM_CHAT_ID в переменные Timeweb'}
+    </p>}
     <div className="grid lg:grid-cols-[220px_1fr] gap-6">
       <nav className="bg-white border rounded-2xl p-2 h-fit" aria-label="Разделы админ-панели">
         {sections.map(([key, label]) => <button key={key} onClick={() => { setSection(key); setQuery(''); }} className={`w-full text-left px-4 py-2.5 rounded-xl ${section === key ? 'bg-brand-600 text-white' : 'hover:bg-gray-50'}`}>{label}</button>)}

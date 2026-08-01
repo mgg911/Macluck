@@ -22,7 +22,7 @@ export default function BannerSlider({ banners }) {
         {banners.map((banner, idx) => (
           <Link
             key={banner.id}
-            to={banner.link}
+            to={banner.link?.trim() || '/catalog'}
             className={`absolute inset-0 transition-opacity duration-700 bg-gradient-to-br ${banner.gradient} ${
               idx === current ? 'opacity-100 z-10' : 'opacity-0 z-0'
             }`}

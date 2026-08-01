@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { SlidersHorizontal, X, Search } from 'lucide-react';
 import ProductCard from '../components/ProductCard';
@@ -9,6 +9,28 @@ import Seo from '../components/Seo';
 
 const RAM_RELEVANT = ['MacBook'];
 const SIM_RELEVANT = ['iPhone', 'iPad'];
+
+const normalize = (value) => String(value || '').trim().toLowerCase();
+
+function matchesCategory(product, value, categories) {
+  const target = normalize(value);
+  if (!target) return true;
+  if (normalize(product.category) === target || normalize(product.subcategory) === target) return true;
+
+  for (const category of categories) {
+    if (normalize(category.slug) === target || normalize(category.name) === target) {
+      return normalize(product.category) === normalize(category.slug);
+    }
+    const child = category.children?.find(
+      (item) => normalize(item.slug) === target || normalize(item.name) === target
+    );
+    if (child) {
+      return normalize(product.category) === normalize(category.slug)
+        && normalize(product.subcategory) === normalize(child.name);
+    }
+  }
+  return false;
+}
 
 // Extract RAM value from techSpecs
 function extractRam(p) {
@@ -26,7 +48,7 @@ function extractScreen(p) {
 }
 
 export default function Catalog() {
-  const { products } = useCatalog();
+  const { products, categories } = useCatalog();
   const { data: siteData } = useSite();
   const customFilters = siteData?.filters || [];
   const [searchParams] = useSearchParams();
@@ -52,21 +74,29 @@ export default function Catalog() {
   const [priceRange, setPriceRange] = useState({ min: 0, max: 500000 });
   const [sort, setSort] = useState('popular');
 
+  useEffect(() => {
+    const category = searchParams.get('category');
+    setCategoryFilter(category ? [category] : []);
+    setSearchQuery(searchParams.get('q') || '');
+  }, [searchParams]);
+
   // Price bounds (global)
-  const allPrices = products.map((p) => p.price);
-  const priceBounds = { min: Math.min(...allPrices), max: Math.max(...allPrices) };
+  const allPrices = products.map((p) => Number(p.price)).filter(Number.isFinite);
+  const priceBounds = allPrices.length
+    ? { min: Math.min(...allPrices), max: Math.max(...allPrices) }
+    : { min: 0, max: 500000 };
 
   // Determine which context-sensitive filters to show based on current category
   const filterContext = useMemo(() => {
     const ctx = categoryFilter.length > 0
-      ? products.filter((p) => categoryFilter.includes(p.category))
+      ? products.filter((p) => categoryFilter.some((value) => matchesCategory(p, value, categories)))
       : products;
     const subs = new Set(ctx.map((p) => p.subcategory));
     return {
       showRam: RAM_RELEVANT.some((s) => subs.has(s)),
       showSim: SIM_RELEVANT.some((s) => subs.has(s)),
     };
-  }, [products, categoryFilter]);
+  }, [products, categoryFilter, categories]);
 
   // Derived filter options
   const filterMeta = useMemo(() => {
@@ -190,7 +220,7 @@ export default function Catalog() {
 
     // Category (from URL)
     if (categoryFilter.length > 0) {
-      result = result.filter((p) => categoryFilter.includes(p.category));
+      result = result.filter((p) => categoryFilter.some((value) => matchesCategory(p, value, categories)));
     }
 
     // Brand
@@ -285,7 +315,7 @@ export default function Catalog() {
     }
 
     return result;
-  }, [products, searchQuery, categoryFilter, selectedBrands, selectedColors, selectedStorage, selectedScreens, selectedYears, selectedRam, selectedSim, selectedAvailability, selectedCustom, priceRange, sort]);
+  }, [products, categories, searchQuery, categoryFilter, selectedBrands, selectedColors, selectedStorage, selectedScreens, selectedYears, selectedRam, selectedSim, selectedAvailability, selectedCustom, priceRange, sort]);
 
   const resetFilters = () => {
     setCategoryFilter([]);
@@ -321,16 +351,16 @@ export default function Catalog() {
       </nav>
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Все товары</h1>
           <p className="text-sm text-gray-500 mt-1">{filteredProducts.length} товаров</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] sm:flex sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
           <select
             value={sort}
             onChange={(e) => setSort(e.target.value)}
-            className="px-3 py-2 rounded-lg border border-gray-200 focus:border-brand-500 outline-none text-sm bg-white"
+            className="min-w-0 w-full sm:w-auto px-3 py-2 rounded-lg border border-gray-200 focus:border-brand-500 outline-none text-sm bg-white"
           >
             <option value="popular">Сначала популярные</option>
             <option value="price-asc">Цена: по возрастанию</option>
@@ -340,7 +370,7 @@ export default function Catalog() {
           </select>
           <button
             onClick={() => setShowMobileFilters(true)}
-            className="lg:hidden flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 transition relative"
+            className="lg:hidden flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 transition relative whitespace-nowrap"
           >
             <SlidersHorizontal size={16} />
             Фильтры

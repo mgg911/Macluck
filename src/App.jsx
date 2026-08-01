@@ -19,10 +19,12 @@ import AdminPage from './pages/AdminPage';
 import ContentPage from './pages/ContentPage';
 import NotFound from './pages/NotFound';
 import { SiteProvider } from './context/SiteContext';
+import ScrollToTop from './components/ScrollToTop';
 
 export default function App() {
   return (
     <BrowserRouter>
+      <ScrollToTop />
       <SiteProvider>
        <CatalogProvider>
         <CartProvider>

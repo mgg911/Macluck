@@ -11,7 +11,7 @@ import Seo from '../components/Seo';
 
 export default function ProductDetail() {
   const { id } = useParams();
-  const { products } = useCatalog();
+  const { products, categories } = useCatalog();
   const { addToCart } = useCart();
   const { isFavorite, toggleFavorite } = useFavorites();
   const [selectedSpecs, setSelectedSpecs] = useState({});
@@ -19,6 +19,10 @@ export default function ProductDetail() {
   const [quantity, setQuantity] = useState(1);
 
   const product = products.find((p) => String(p.id) === id || p.slug === id);
+  const productCategory = categories.find((category) => category.slug === product?.category);
+  const productSubcategory = productCategory?.children?.find(
+    (subcategory) => subcategory.name.toLowerCase() === product?.subcategory?.toLowerCase()
+  );
   const relatedProducts = useMemo(() => {
     if (!product) return [];
     const sameSubcategory = products.filter(
@@ -91,7 +95,7 @@ export default function ProductDetail() {
         <ChevronRight size={14} />
         <Link to={`/brand/${product.category}`} className="hover:text-brand-600">{product.brand}</Link>
         <ChevronRight size={14} />
-        <Link to={`/category/${product.brand}/${product.subcategory}`} className="hover:text-brand-600">{product.subcategory}</Link>
+        <Link to={`/brand/${productSubcategory?.slug || product.category}`} className="hover:text-brand-600">{product.subcategory}</Link>
         <ChevronRight size={14} />
         <span className="text-gray-900 truncate">{product.name}</span>
       </nav>

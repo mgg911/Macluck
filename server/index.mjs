@@ -170,10 +170,24 @@ async function telegram(order) {
   return { sent: true };
 }
 
+function isAllowedOrigin(req) {
+  const origin = req.headers.origin;
+  if (!origin || allowedOrigins.has(origin)) return true;
+  try {
+    const requestHost = String(req.headers['x-forwarded-host'] || req.headers.host || '')
+      .split(',')[0]
+      .trim()
+      .toLowerCase();
+    return new URL(origin).host.toLowerCase() === requestHost;
+  } catch {
+    return false;
+  }
+}
+
 async function route(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const path = url.pathname;
-  if (req.method !== 'GET' && req.headers.origin && !allowedOrigins.has(req.headers.origin)) {
+  if (req.method !== 'GET' && !isAllowedOrigin(req)) {
     return json(res, 403, { error: 'Недопустимый источник запроса' });
   }
   if (path === '/api/health') return json(res, 200, { ok: true });

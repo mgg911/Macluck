@@ -6,23 +6,28 @@ import { useCatalog } from '../context/CatalogContext';
 import Seo from '../components/Seo';
 
 export default function BrandPage() {
-  const { brand } = useParams();
+  const { brand, subcategory } = useParams();
   const { products, categories } = useCatalog();
   const [sort, setSort] = useState('popular');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSubcategory, setActiveSubcategory] = useState(null);
 
   const { category, childSlug } = useMemo(() => {
-    const top = categories.find((c) => c.slug === brand);
+    const routeValue = decodeURIComponent(subcategory || brand || '').toLowerCase();
+    const top = categories.find((c) =>
+      c.slug.toLowerCase() === routeValue || c.name.toLowerCase() === routeValue
+    );
     if (top) return { category: top, childSlug: null };
     for (const cat of categories) {
       if (cat.children) {
-        const child = cat.children.find((c) => c.slug === brand);
+        const child = cat.children.find((c) =>
+          c.slug.toLowerCase() === routeValue || c.name.toLowerCase() === routeValue
+        );
         if (child) return { category: cat, childSlug: child.slug };
       }
     }
     return { category: null, childSlug: null };
-  }, [brand]);
+  }, [brand, subcategory, categories]);
 
   const catProducts = products.filter((p) => p.category === category?.slug);
   const hasChildren = category?.children?.length > 0;

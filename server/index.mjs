@@ -283,8 +283,8 @@ async function route(req, res) {
   if (path === '/api/auth/login' && req.method === 'POST') {
     if (rateLimited(req, 'login', 5, 15 * 60_000)) return json(res, 429, { error: 'Слишком много попыток' });
     const data = await body(req);
-    const login = process.env.ADMIN_LOGIN;
-    const password = process.env.ADMIN_PASSWORD;
+    const login = process.env.ADMIN_LOGIN?.trim();
+    const password = process.env.ADMIN_PASSWORD?.trim();
     if (!login || !password || password.startsWith('CHANGE_ME')) return json(res, 503, { error: 'Администратор не настроен' });
     if (!secureEqual(data.login, login) || !secureEqual(data.password, password)) return json(res, 401, { error: 'Неверный логин или пароль' });
     const token = randomBytes(32).toString('hex');

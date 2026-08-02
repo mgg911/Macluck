@@ -44,3 +44,81 @@ body {
   max-height: 600px;
   opacity: 1;
 }
+
+/* Rich informational pages */
+.content-rich {
+  color: #334155;
+  font-size: 1rem;
+  line-height: 1.8;
+}
+
+.content-rich > h1:first-child {
+  display: none;
+}
+
+.content-rich h2 {
+  margin: 2.75rem 0 1.25rem;
+  padding-top: 2.25rem;
+  border-top: 1px solid #e2e8f0;
+  color: #0f172a;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  font-weight: 750;
+  line-height: 1.25;
+  letter-spacing: -0.025em;
+}
+
+.content-rich h2:first-of-type {
+  margin-top: 1.25rem;
+}
+
+.content-rich h3 {
+  position: relative;
+  margin: 2rem 0 0.55rem;
+  padding-left: 1.25rem;
+  color: #0f172a;
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.content-rich h3::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.48rem;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: #1a6fff;
+  box-shadow: 0 0 0 5px #eff6ff;
+}
+
+.content-rich p {
+  margin: 0.8rem 0;
+  max-width: 76ch;
+}
+
+.content-rich > p:first-of-type {
+  margin: 0 0 1.75rem;
+  padding: 1.1rem 1.25rem;
+  border-left: 4px solid #1a6fff;
+  border-radius: 0 0.9rem 0.9rem 0;
+  background: #eff6ff;
+  color: #0f172a;
+  font-size: 1.08rem;
+}
+
+.content-rich strong {
+  color: #0f172a;
+  font-weight: 700;
+}
+
+@media (min-width: 768px) {
+  .content-rich {
+    font-size: 1.0625rem;
+  }
+
+  .content-rich h3 {
+    font-size: 1.25rem;
+  }
+}

@@ -68,14 +68,14 @@ const deliveryContent = `<h1>Оплата и доставка</h1>
 <p>Возврат возможен в течение 14 дней.</p>`;
 
 const defaultSettings = {
-  contentVersion: 2,
+  contentVersion: 4,
   siteName: 'MacLuck',
   logo: '/images/macluck-logo.png',
   favicon: '/images/macluck-logo.png',
-  phone: '[УКАЖИТЕ ТЕЛЕФОН]',
+  phone: '',
   email: 'macluck.store@yandex.ru',
-  address: '[УКАЖИТЕ АДРЕС]',
-  hours: '[УКАЖИТЕ ВРЕМЯ РАБОТЫ]',
+  address: '',
+  hours: '',
   social: { telegram: 'https://t.me/macluckru', vk: 'https://vk.ru/macluck.store', whatsapp: '' },
   seo: {
     title: 'MacLuck — оригинальная техника и аксессуары',
@@ -106,11 +106,17 @@ if (Number(db.settings?.contentVersion || 0) < defaultSettings.contentVersion) {
     logo: defaultSettings.logo,
     favicon: defaultSettings.favicon,
     email: defaultSettings.email,
+    phone: /^\[.*\]$/.test(db.settings?.phone || '') ? '' : (db.settings?.phone || ''),
+    address: /^\[.*\]$/.test(db.settings?.address || '') ? '' : (db.settings?.address || ''),
+    hours: /^\[.*\]$/.test(db.settings?.hours || '') ? '' : (db.settings?.hours || ''),
     social: { ...db.settings?.social, ...defaultSettings.social },
     seo: { ...db.settings?.seo, ...defaultSettings.seo },
     about: defaultSettings.about,
     delivery: defaultSettings.delivery,
   };
+  db.legal = (db.legal || []).map((item) =>
+    String(item.content || '').includes('[УКАЖИТЕ') ? { ...item, content: `<h1>${item.title}</h1>` } : item
+  );
   await save();
 }
 
@@ -138,7 +144,7 @@ async function loadDatabase() {
       orders: [],
       legal: legalDefaults.map(([slug, title]) => ({
         id: slug, slug, title,
-        content: `<h1>${title}</h1><p>[УКАЖИТЕ РЕКВИЗИТЫ И УТВЕРЖДЁННЫЙ ЮРИСТОМ ТЕКСТ]</p>`,
+        content: `<h1>${title}</h1>`,
         seoTitle: title, seoDescription: '',
       })),
       settings: defaultSettings,

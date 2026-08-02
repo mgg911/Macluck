@@ -28,10 +28,10 @@ export default function Footer() {
         <div>
           <h3 className="font-bold text-white mb-4">Контакты</h3>
           <ul className="space-y-2 text-sm">
-            <li>{settings.address || '[УКАЖИТЕ АДРЕС]'}</li>
-            <li><a href={`tel:${settings.phone || ''}`}>{settings.phone || '[УКАЖИТЕ ТЕЛЕФОН]'}</a></li>
-            <li><a href={`mailto:${settings.email || ''}`}>{settings.email || 'macluck.store@yandex.ru'}</a></li>
-            <li>{settings.hours || '[УКАЖИТЕ ВРЕМЯ РАБОТЫ]'}</li>
+            {settings.address && <li>{settings.address}</li>}
+            {settings.phone && <li><a href={`tel:${settings.phone}`}>{settings.phone}</a></li>}
+            {settings.email && <li><a href={`mailto:${settings.email}`}>{settings.email}</a></li>}
+            {settings.hours && <li>{settings.hours}</li>}
           </ul>
           <div className="flex flex-wrap gap-3 mt-4 text-sm">
             {Object.entries(settings.social || {}).filter(([, url]) => url).map(([name, url]) => <a key={name} href={url} target="_blank" rel="noreferrer" className="hover:text-white">{{ telegram: 'Telegram', vk: 'VK', whatsapp: 'WhatsApp' }[name] || name}</a>)}

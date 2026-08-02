@@ -50,7 +50,15 @@ const aboutContent = `<h1>О компании Macluck</h1>
 <h2>Наша миссия</h2>
 <p>Мы хотим, чтобы покупка техники вызывала только положительные эмоции.</p>
 <p>Наша цель — создать магазин, в который возвращаются снова и снова не только благодаря выгодным ценам, но и благодаря честному отношению, высокому уровню сервиса и уверенности в качестве каждого устройства.</p>
-<p>Macluck — это место, где современные технологии сочетаются с настоящей заботой о клиентах. Мы ценим ваше доверие и ежедневно работаем над тем, чтобы оправдывать его на все 100%.</p>`;
+<p>Macluck — это место, где современные технологии сочетаются с настоящей заботой о клиентах. Мы ценим ваше доверие и ежедневно работаем над тем, чтобы оправдывать его на все 100%.</p>
+<h2>Данные об ИП</h2>
+<div class="company-details">
+  <div><span>ИНН</span><strong>590800775583</strong></div>
+  <div><span>ОГРНИП</span><strong>322665800215742</strong></div>
+  <div><span>Дата регистрации</span><strong>16 ноября 2022 года</strong></div>
+  <div><span>Регион регистрации</span><strong>Чеченская Республика</strong><small>Зарегистрирован налоговым органом в Чечне</small></div>
+  <div class="company-details-wide"><span>Основной вид деятельности</span><strong>Торговля розничная по почте или по информационно-коммуникационной сети Интернет</strong><small>Код ОКВЭД 47.91</small></div>
+</div>`;
 
 const deliveryContent = `<h1>Оплата и доставка</h1>
 <h2>Способы оплаты</h2>
@@ -68,7 +76,7 @@ const deliveryContent = `<h1>Оплата и доставка</h1>
 <p>Возврат возможен в течение 14 дней.</p>`;
 
 const defaultSettings = {
-  contentVersion: 4,
+  contentVersion: 5,
   siteName: 'MacLuck',
   logo: '/images/macluck-logo.png',
   favicon: '/images/macluck-logo.png',
@@ -77,6 +85,14 @@ const defaultSettings = {
   address: '',
   hours: '',
   social: { telegram: 'https://t.me/macluckru', vk: 'https://vk.ru/macluck.store', whatsapp: '' },
+  business: {
+    inn: '590800775583',
+    ogrnip: '322665800215742',
+    registrationDate: '16 ноября 2022 года',
+    registrationRegion: 'Чеченская Республика',
+    activity: 'Торговля розничная по почте или по информационно-коммуникационной сети Интернет',
+    okved: '47.91',
+  },
   seo: {
     title: 'MacLuck — оригинальная техника и аксессуары',
     description: 'MacLuck — магазин оригинальной техники Apple, Dyson, PlayStation и других ведущих брендов с доставкой по Москве и России.',
@@ -110,6 +126,7 @@ if (Number(db.settings?.contentVersion || 0) < defaultSettings.contentVersion) {
     address: /^\[.*\]$/.test(db.settings?.address || '') ? '' : (db.settings?.address || ''),
     hours: /^\[.*\]$/.test(db.settings?.hours || '') ? '' : (db.settings?.hours || ''),
     social: { ...db.settings?.social, ...defaultSettings.social },
+    business: defaultSettings.business,
     seo: { ...db.settings?.seo, ...defaultSettings.seo },
     about: defaultSettings.about,
     delivery: defaultSettings.delivery,

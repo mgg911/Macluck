@@ -33,6 +33,10 @@ export default function Footer() {
             {settings.email && <li><a href={`mailto:${settings.email}`}>{settings.email}</a></li>}
             {settings.hours && <li>{settings.hours}</li>}
           </ul>
+          {settings.business && <div className="mt-5 pt-4 border-t border-gray-800 text-xs text-gray-400 space-y-1">
+            <p>ИНН {settings.business.inn}</p>
+            <p>ОГРНИП {settings.business.ogrnip}</p>
+          </div>}
           <div className="flex flex-wrap gap-3 mt-4 text-sm">
             {Object.entries(settings.social || {}).filter(([, url]) => url).map(([name, url]) => <a key={name} href={url} target="_blank" rel="noreferrer" className="hover:text-white">{{ telegram: 'Telegram', vk: 'VK', whatsapp: 'WhatsApp' }[name] || name}</a>)}
           </div>

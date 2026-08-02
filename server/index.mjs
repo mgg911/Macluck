@@ -401,7 +401,16 @@ async function serveStatic(path, res) {
   }
   try {
     const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp' };
-    res.writeHead(statusCode, { 'content-type': types[extname(target)] || 'application/octet-stream' });
+    const extension = extname(target);
+    const cacheControl = extension === '.html'
+      ? 'no-store, no-cache, must-revalidate'
+      : path.startsWith('/assets/')
+        ? 'public, max-age=31536000, immutable'
+        : 'public, max-age=3600';
+    res.writeHead(statusCode, {
+      'content-type': types[extension] || 'application/octet-stream',
+      'cache-control': cacheControl,
+    });
     createReadStream(target).pipe(res);
   } catch { json(res, 404, { error: 'Not found' }); }
 }

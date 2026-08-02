@@ -107,7 +107,7 @@ function Editor({ section, value, onClose, onSaved }) {
           placeholder="/brand/iphone или /product/iphone-17-pro-max"
           className="mt-1 w-full border rounded-lg px-3 py-2 font-normal"
         />
-        <span className="block mt-1 text-xs text-gray-500">Категория: /brand/iphone · товар: /product/iphone-17-pro-max · весь каталог: /catalog</span>
+        <span className="block mt-1 text-xs text-gray-500">Категория: /brand/iphone · товар: /product/iphone-17-pro-max · весь каталог: /catalog. Рекомендуемый размер баннера: 1920×640 px; важный текст и объекты размещайте по центру, чтобы они не обрезались на телефоне.</span>
       </label>}
       <textarea aria-label="Данные записи" value={text} onChange={e => setText(e.target.value)} className="w-full h-96 font-mono text-sm border rounded-xl p-3" />
       {['products', 'news', 'banners'].includes(section) && <label className="block mt-3 text-sm">

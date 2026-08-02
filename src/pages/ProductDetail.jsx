@@ -263,11 +263,11 @@ export default function ProductDetail() {
             </div>
             <div className="flex items-center gap-2 text-sm text-gray-600">
               <Shield size={16} className="text-brand-600" />
-              Гарантия на товар
+              Гарантия 1 год
             </div>
             <div className="flex items-center gap-2 text-sm text-gray-600">
               <Clock size={16} className="text-brand-600" />
-              Доставка за 24ч по Москве
+              Доставка до 3 часов по Москве
             </div>
           </div>
         </div>

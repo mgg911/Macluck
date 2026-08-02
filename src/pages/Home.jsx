@@ -53,8 +53,8 @@ export default function Home() {
             <MapPin size={20} className="text-white" />
           </div>
           <div className="min-w-0">
-            <h3 className="text-white font-bold text-sm leading-tight">Доставка по Москве за 24 часа</h3>
-            <p className="text-emerald-100 text-xs mt-0.5">Привезём в день оформления</p>
+            <h3 className="text-white font-bold text-sm leading-tight">Бесплатная доставка по Москве</h3>
+            <p className="text-emerald-100 text-xs mt-0.5">До 3 часов при заказе до 16:30</p>
           </div>
         </div>
         <div className="rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 p-4 flex items-center gap-3 shadow-sm">
@@ -62,8 +62,8 @@ export default function Home() {
             <Wallet size={20} className="text-white" />
           </div>
           <div className="min-w-0">
-            <h3 className="text-white font-bold text-sm leading-tight">Оплата при получении по Москве</h3>
-            <p className="text-amber-100 text-xs mt-0.5">Проверьте товар перед оплатой</p>
+            <h3 className="text-white font-bold text-sm leading-tight">Оплата наличными</h3>
+            <p className="text-amber-100 text-xs mt-0.5">Безналичная оплата появится позже</p>
           </div>
         </div>
       </div>

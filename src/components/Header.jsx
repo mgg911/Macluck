@@ -216,7 +216,7 @@ export default function Header() {
             <Truck size={14} className="text-brand-400" />
             Доставка по всей России
           </span>
-          <span className="hidden md:inline text-gray-400">Оплата при получении по Москве</span>
+          <span className="hidden md:inline text-gray-400">Бесплатная доставка по Москве до 3 часов</span>
         </div>
       </div>
 
@@ -229,7 +229,7 @@ export default function Header() {
 
         {/* Logo */}
         <Link to="/" className="flex-shrink-0">
-          <img src={siteData?.settings?.logo || "/images/macluck-logo.svg"} alt={siteData?.settings?.siteName || "MacLuck"} className="h-10 w-auto" />
+          <img src={siteData?.settings?.logo || "/images/macluck-logo.png"} alt={siteData?.settings?.siteName || "MacLuck"} className="h-12 w-12 object-contain" />
         </Link>
 
         {/* Desktop nav */}

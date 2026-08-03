@@ -77,7 +77,7 @@ const deliveryContent = `<h1>Оплата и доставка</h1>
 <p>Возврат возможен в течение 14 дней.</p>`;
 
 const defaultSettings = {
-  contentVersion: 5,
+  contentVersion: 6,
   siteName: 'MacLuck',
   logo: '/images/macluck-logo.png',
   favicon: '/images/macluck-logo.png',
@@ -97,7 +97,7 @@ const defaultSettings = {
   seo: {
     title: 'MacLuck — оригинальная техника и аксессуары',
     description: 'MacLuck — магазин оригинальной техники Apple, Dyson, PlayStation и других ведущих брендов с доставкой по Москве и России.',
-    publicUrl: process.env.PUBLIC_URL || 'https://mgg911-macluck-fc17.twc1.net',
+    publicUrl: process.env.PUBLIC_URL || 'https://macluck.ru',
   },
   about: aboutContent,
   delivery: deliveryContent,

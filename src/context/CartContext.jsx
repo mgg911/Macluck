@@ -1,4 +1,6 @@
 import { createContext, useContext, useReducer, useState, useEffect } from 'react';
+import { getProductImages, getProductPrice, sanitizeProductSpecs } from '../utils/productVariants';
+import { useCatalog } from './CatalogContext';
 
 const STORAGE_KEY = 'macluck_cart';
 
@@ -35,6 +37,22 @@ function cartReducer(state, action) {
       return { ...state, items: [] };
     case 'LOAD_CART':
       return { ...state, items: action.items };
+    case 'SYNC_CATALOG':
+      return {
+        ...state,
+        items: state.items.map((item) => {
+          const product = action.products.find((candidate) => String(candidate.id) === String(item.productId));
+          if (!product) return item;
+          const specs = sanitizeProductSpecs(product, item.specs || {});
+          return {
+            ...item,
+            name: product.name,
+            price: getProductPrice(product, specs),
+            image: getProductImages(product, specs)[0] || product.image,
+            specs,
+          };
+        }),
+      };
     default:
       return state;
   }
@@ -50,6 +68,7 @@ function loadCart() {
 }
 
 export function CartProvider({ children }) {
+  const { products } = useCatalog();
   const [state, dispatch] = useReducer(cartReducer, { items: [] });
   const [isLoaded, setIsLoaded] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
@@ -68,16 +87,21 @@ export function CartProvider({ children }) {
     }
   }, [state.items, isLoaded]);
 
+  useEffect(() => {
+    if (isLoaded && products.length) dispatch({ type: 'SYNC_CATALOG', products });
+  }, [products, isLoaded]);
+
   const addToCart = (product, specs, quantity = 1) => {
+    const selectedSpecs = sanitizeProductSpecs(product, specs);
     const cartId = `${product.id}-${Date.now()}`;
     dispatch({
       type: 'ADD_ITEM',
       cartId,
       productId: product.id,
       name: product.name,
-      price: product.price,
-      image: product.image,
-      specs,
+      price: getProductPrice(product, selectedSpecs),
+      image: getProductImages(product, selectedSpecs)[0] || product.image,
+      specs: selectedSpecs,
       quantity,
     });
     setIsOpen(true);

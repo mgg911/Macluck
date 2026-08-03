@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ChevronRight, ShoppingCart, Heart, Star, Truck, Shield, Clock } from 'lucide-react';
 import { useCatalog } from '../context/CatalogContext';
@@ -8,6 +8,7 @@ import { colorMap } from '../data/products';
 import SimConfigurator from '../components/SimConfigurator';
 import ProductCard from '../components/ProductCard';
 import Seo from '../components/Seo';
+import { getProductImages, getProductPrice, sanitizeProductSpecs } from '../utils/productVariants';
 
 export default function ProductDetail() {
   const { id } = useParams();
@@ -17,6 +18,7 @@ export default function ProductDetail() {
   const [selectedSpecs, setSelectedSpecs] = useState({});
   const [selectedSim, setSelectedSim] = useState(null);
   const [quantity, setQuantity] = useState(1);
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
 
   const product = products.find((p) => String(p.id) === id || p.slug === id);
   const productCategory = categories.find((category) => category.slug === product?.category);
@@ -33,6 +35,24 @@ export default function ProductDetail() {
     );
     return [...sameSubcategory, ...sameCategory].slice(0, 5);
   }, [products, product]);
+  const effectiveSpecs = useMemo(
+    () => sanitizeProductSpecs(product, {
+      ...selectedSpecs,
+      ...(selectedSim ? { 'SIM-конфигурация': selectedSim } : {}),
+    }),
+    [product, selectedSpecs, selectedSim]
+  );
+  const galleryImages = useMemo(
+    () => getProductImages(product, effectiveSpecs),
+    [product, effectiveSpecs]
+  );
+  const currentPrice = getProductPrice(product, effectiveSpecs);
+  const productId = product?.id;
+  const selectedColor = effectiveSpecs['Цвет'];
+
+  useEffect(() => {
+    setActiveImageIndex(0);
+  }, [productId, selectedColor]);
 
   if (!product) {
     if (products.length === 0) {
@@ -52,29 +72,8 @@ export default function ProductDetail() {
 
   const formatPrice = (p) => (p ?? 0).toLocaleString('ru-RU') + ' ₽';
 
-  const getCurrentPrice = () => {
-    let price = product.price;
-    // Apply memory price adjustments
-    if (selectedSpecs['Память']) {
-      const memSpec = product.specs.find((s) => s.name === 'Память' || s.name === 'Объём памяти');
-      // Add simple price bump for larger storage
-      const memOption = memSpec?.options.findIndex((o) => o.value === selectedSpecs['Память']);
-      if (memOption > 0) price += memOption * 15000;
-    }
-    return price;
-  };
-
-  const currentPrice = getCurrentPrice();
-
   const handleAddToCart = () => {
-    const specs = {};
-    product.specs.forEach((spec) => {
-      if (spec.options.length > 0) {
-        specs[spec.name] = selectedSpecs[spec.name] || spec.options[0].value;
-      }
-    });
-    if (selectedSim) specs['SIM-конфигурация'] = selectedSim;
-    addToCart(product, specs, quantity);
+    addToCart(product, effectiveSpecs, quantity);
   };
 
   const allSelected = product.specs.every(
@@ -86,8 +85,8 @@ export default function ProductDetail() {
       <Seo
         title={product.seoTitle || `${product.name} — купить в MacLuck`}
         description={product.seoDescription || product.description}
-        image={product.image}
-        schema={{ '@context': 'https://schema.org', '@type': 'Product', name: product.name, image: product.image, description: product.description, offers: { '@type': 'Offer', priceCurrency: 'RUB', price: product.price, availability: 'https://schema.org/InStock' } }}
+        image={galleryImages[0] || product.image}
+        schema={{ '@context': 'https://schema.org', '@type': 'Product', name: product.name, image: galleryImages, description: product.description, offers: { '@type': 'Offer', priceCurrency: 'RUB', price: currentPrice, availability: 'https://schema.org/InStock' } }}
       />
       {/* Breadcrumbs */}
       <nav className="flex items-center gap-1 text-sm text-gray-500 mb-6 flex-wrap">
@@ -101,21 +100,39 @@ export default function ProductDetail() {
       </nav>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* Image */}
-        <div className="aspect-square bg-gray-50 rounded-2xl overflow-hidden">
-          <img
-            src={product.image}
-            alt={product.name}
-            className="w-full h-full object-cover"
-            onError={(e) => {
-              e.target.onerror = null;
-              e.target.src =
-                "data:image/svg+xml," +
-                encodeURIComponent(
-                  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400"><rect width="400" height="400" fill="#f3f4f6"/><text x="200" y="200" text-anchor="middle" font-size="16" fill="#9ca3af" font-family="Arial">${product.name}</text></svg>`
-                );
-            }}
-          />
+        {/* Image gallery */}
+        <div className="min-w-0">
+          <div className="aspect-square bg-gray-50 rounded-2xl overflow-hidden">
+            <img
+              src={galleryImages[activeImageIndex] || product.image}
+              alt={`${product.name}${galleryImages.length > 1 ? `, фото ${activeImageIndex + 1}` : ''}`}
+              className="w-full h-full object-contain"
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src =
+                  "data:image/svg+xml," +
+                  encodeURIComponent(
+                    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400"><rect width="400" height="400" fill="#f3f4f6"/><text x="200" y="200" text-anchor="middle" font-size="16" fill="#9ca3af" font-family="Arial">${product.name}</text></svg>`
+                  );
+              }}
+            />
+          </div>
+          {galleryImages.length > 1 && (
+            <div className="flex gap-2 mt-3 overflow-x-auto pb-1" aria-label="Фотографии товара">
+              {galleryImages.map((image, index) => (
+                <button
+                  type="button"
+                  key={`${image}-${index}`}
+                  onClick={() => setActiveImageIndex(index)}
+                  className={`w-20 h-20 flex-none rounded-xl border-2 overflow-hidden bg-white ${activeImageIndex === index ? 'border-brand-600' : 'border-gray-200'}`}
+                  aria-label={`Показать фото ${index + 1}`}
+                  aria-current={activeImageIndex === index ? 'true' : undefined}
+                >
+                  <img src={image} alt="" className="w-full h-full object-contain" />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Info */}
@@ -233,16 +250,7 @@ export default function ProductDetail() {
                 {product.inStock ? 'Добавить в корзину' : 'Нет в наличии'}
               </button>
               <button
-                onClick={() => {
-                  const specs = {};
-                  product.specs.forEach((spec) => {
-                    if (spec.options.length > 0) {
-                      specs[spec.name] = selectedSpecs[spec.name] || spec.options[0].value;
-                    }
-                  });
-                  if (selectedSim) specs['SIM-конфигурация'] = selectedSim;
-                  toggleFavorite(product, specs);
-                }}
+                onClick={() => toggleFavorite(product, effectiveSpecs)}
                 className="p-3 rounded-xl border border-gray-200 hover:bg-gray-50 transition"
                 title={isFavorite(product.id) ? 'Убрать из избранного' : 'Добавить в избранное'}
               >

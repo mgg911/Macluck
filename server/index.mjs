@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { randomBytes, scryptSync, timingSafeEqual, randomUUID } from 'node:crypto';
 import { products, categories, banners } from '../src/data/products.js';
 import { news } from '../src/data/news.js';
+import { getProductImages, getProductPrice, sanitizeProductSpecs } from '../src/utils/productVariants.js';
 
 loadEnv(resolve('.env'));
 const PORT = Number(process.env.PORT || 3001);
@@ -240,7 +241,10 @@ async function telegram(order) {
     `Доставка: ${order.deliveryMethod}`,
     `Адрес: ${order.customer.address || order.customer.pickupAddress || ''}`,
     `Сумма: ${order.total.toLocaleString('ru-RU')} ₽`,
-    ...order.items.map(i => `• ${i.name} × ${i.quantity} — ${i.price * i.quantity} ₽`),
+    ...order.items.map(i => {
+      const specs = Object.values(i.specs || {}).filter(Boolean).join(", ");
+      return `• ${i.name}${specs ? ` (${specs})` : ""} × ${i.quantity} — ${(i.price * i.quantity).toLocaleString("ru-RU")} ₽`;
+    }),
   ];
   const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
     method: 'POST',
@@ -326,12 +330,15 @@ async function route(req, res) {
       const product = db.products.find(p => String(p.id) === String(requested.id) && p.published !== false);
       const quantity = Math.max(1, Math.min(99, Number(requested.quantity) || 1));
       if (!product) return json(res, 400, { error: 'Один из товаров больше недоступен' });
-      calculated.push({ productId: product.id, name: product.name, price: Number(product.price), quantity, image: product.image });
+      const specs = sanitizeProductSpecs(product, requested.specs || {});
+      const price = getProductPrice(product, specs);
+      const image = getProductImages(product, specs)[0] || product.image;
+      calculated.push({ productId: product.id, name: product.name, price, quantity, image, specs });
     }
     const duplicate = db.orders.find(order =>
       Date.now() - new Date(order.createdAt).getTime() < 30_000 &&
       order.customer.phone === data.customer.phone &&
-      JSON.stringify(order.items.map(i => [String(i.productId), i.quantity])) === JSON.stringify(calculated.map(i => [String(i.productId), i.quantity]))
+      JSON.stringify(order.items.map(i => [String(i.productId), i.quantity, i.specs || {}])) === JSON.stringify(calculated.map(i => [String(i.productId), i.quantity, i.specs || {}]))
     );
     if (duplicate) return json(res, 200, { number: duplicate.number, total: duplicate.total, duplicate: true });
     const order = {

@@ -34,7 +34,7 @@ export default function CartPage() {
           customer: form,
           deliveryMethod,
           consent,
-          items: items.map(item => ({ id: item.productId, quantity: item.quantity })),
+          items: items.map(item => ({ id: item.productId, quantity: item.quantity, specs: item.specs || {} })),
         },
       });
       setOrderNumber(result.number);

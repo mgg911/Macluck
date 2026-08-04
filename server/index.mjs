@@ -186,7 +186,7 @@ function responseHeaders(extra = {}) {
     'x-frame-options': 'DENY',
     'referrer-policy': 'strict-origin-when-cross-origin',
     'permissions-policy': 'camera=(), microphone=(), geolocation=()',
-    ...(process.env.NODE_ENV === 'production' ? { 'strict-transport-security': 'max-age=31536000; includeSubDomains' } : {}),
+    'strict-transport-security': 'max-age=31536000; includeSubDomains',
     ...extra,
   };
 }
@@ -207,6 +207,11 @@ function isAdmin(req) {
   const token = cookies(req).ml_session;
   const session = token && sessions.get(token);
   return Boolean(session && session.expires > Date.now());
+}
+
+function isHttpsRequest(req) {
+  const forwardedProtocol = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim().toLowerCase();
+  return Boolean(req.socket.encrypted || forwardedProtocol === 'https' || process.env.NODE_ENV === 'production');
 }
 
 async function body(req, limit = 2_000_000) {
@@ -379,7 +384,7 @@ async function route(req, res) {
     const token = randomBytes(32).toString('hex');
     sessions.set(token, { expires: Date.now() + 8 * 60 * 60_000 });
     return json(res, 200, { ok: true }, {
-      'set-cookie': `ml_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800${process.env.NODE_ENV === 'production' ? '; Secure' : ''}`,
+      'set-cookie': `ml_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800${isHttpsRequest(req) ? '; Secure' : ''}`,
     });
   }
   if (path === '/api/auth/logout' && req.method === 'POST') {

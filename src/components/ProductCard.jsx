@@ -5,10 +5,10 @@ import { useFavorites } from '../context/FavoritesContext';
 import { useCart } from '../context/CartContext';
 import { colorMap } from '../data/products';
 import SimConfigurator from './SimConfigurator';
+import { getProductImages, getProductPrice, sanitizeProductSpecs } from '../utils/productVariants';
 
-function getMemoryOptions(specs) {
-  const memSpec = specs.find((s) => s.name === 'Память' || s.name === 'Объём памяти');
-  return memSpec ? memSpec.options : [];
+function getMemorySpec(specs) {
+  return specs.find((spec) => spec.name === 'Память' || spec.name === 'Объём памяти');
 }
 
 export default function ProductCard({ product, activeColor, initialMemory }) {
@@ -16,7 +16,8 @@ export default function ProductCard({ product, activeColor, initialMemory }) {
   const { addToCart } = useCart();
   const [showConfigModal, setShowConfigModal] = useState(false);
 
-  const colorOptions = useMemo(() => product.specs.find((s) => s.name === 'Цвет')?.options || [], [product.specs]);
+  const productSpecs = useMemo(() => product.specs || [], [product.specs]);
+  const colorOptions = useMemo(() => productSpecs.find((spec) => spec.name === 'Цвет')?.options || [], [productSpecs]);
   const [selectedColor, setSelectedColor] = useState(
     activeColor
       ? colorOptions.find((c) => c.unifiedColor === activeColor)?.value ?? colorOptions[0]?.value
@@ -24,24 +25,63 @@ export default function ProductCard({ product, activeColor, initialMemory }) {
   );
 
   useEffect(() => {
-    if (!activeColor) return;
-    const found = colorOptions.find((c) => c.unifiedColor === activeColor);
-    if (found) setSelectedColor(found.value);
+    setSelectedColor((current) => {
+      const requested = activeColor && colorOptions.find((color) => color.unifiedColor === activeColor)?.value;
+      if (requested) return requested;
+      return colorOptions.some((color) => color.value === current) ? current : colorOptions[0]?.value;
+    });
   }, [activeColor, colorOptions]);
 
-  const memoryOptions = getMemoryOptions(product.specs);
+  const memorySpec = useMemo(() => getMemorySpec(productSpecs), [productSpecs]);
+  const memoryOptions = useMemo(() => memorySpec?.options || [], [memorySpec]);
   const [selectedMemory, setSelectedMemory] = useState(initialMemory ?? memoryOptions[0]?.value);
+
+  useEffect(() => {
+    setSelectedMemory((current) => {
+      if (initialMemory && memoryOptions.some((option) => option.value === initialMemory)) return initialMemory;
+      return memoryOptions.some((option) => option.value === current) ? current : memoryOptions[0]?.value;
+    });
+  }, [initialMemory, memoryOptions]);
   const [selectedSim, setSelectedSim] = useState(null);
   const [modalQuantity, setModalQuantity] = useState(1);
 
   // Build spec selections for the modal — all specs except color & memory (handled separately)
-  const otherSpecs = product.specs.filter((s) => s.name !== 'Цвет' && s.name !== 'Память' && s.name !== 'Объём памяти');
+  const otherSpecs = useMemo(() => productSpecs.filter((spec) => spec.name !== 'Цвет' && spec.name !== 'Память' && spec.name !== 'Объём памяти'), [productSpecs]);
   const [otherSelections, setOtherSelections] = useState(() => {
     const init = {};
     otherSpecs.forEach((s) => { init[s.name] = s.options[0]?.value; });
     return init;
   });
+  useEffect(() => {
+    setOtherSelections((current) => Object.fromEntries(otherSpecs.map((spec) => [
+      spec.name,
+      spec.options.some((option) => option.value === current[spec.name]) ? current[spec.name] : spec.options[0]?.value,
+    ])));
+  }, [otherSpecs]);
 
+  const effectiveSpecs = useMemo(() => sanitizeProductSpecs(product, {
+    ...otherSelections,
+    ...(selectedColor ? { Цвет: selectedColor } : {}),
+    ...(selectedMemory && memorySpec ? { [memorySpec.name]: selectedMemory } : {}),
+    ...(selectedSim ? { 'SIM-конфигурация': selectedSim } : {}),
+  }), [memorySpec, otherSelections, product, selectedColor, selectedMemory, selectedSim]);
+  const currentPrice = getProductPrice(product, effectiveSpecs);
+  const currentImages = getProductImages(product, effectiveSpecs);
+  const currentImage = currentImages[0] || product.image;
+
+  useEffect(() => {
+    if (!showConfigModal) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setShowConfigModal(false);
+    };
+    document.body.style.overflow = 'hidden';
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [showConfigModal]);
   const handleOpenConfig = (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -50,14 +90,7 @@ export default function ProductCard({ product, activeColor, initialMemory }) {
   };
 
   const handleConfirmAdd = () => {
-    const specs = {};
-    if (selectedColor) specs.Цвет = selectedColor;
-    if (selectedMemory) specs.Память = selectedMemory;
-    if (selectedSim) specs['SIM-конфигурация'] = selectedSim;
-    otherSpecs.forEach((s) => {
-      if (otherSelections[s.name]) specs[s.name] = otherSelections[s.name];
-    });
-    addToCart(product, specs, modalQuantity);
+    addToCart(product, effectiveSpecs, modalQuantity);
     setShowConfigModal(false);
   };
 
@@ -65,14 +98,12 @@ export default function ProductCard({ product, activeColor, initialMemory }) {
 
   return (
     <>
-      <Link
-        to={`/product/${product.id}`}
-        className="group bg-white rounded-2xl border border-gray-100 hover:shadow-lg hover:border-gray-200 transition-all duration-300 overflow-hidden flex flex-col h-full"
-      >
+      <article className="group bg-white rounded-2xl border border-gray-100 hover:shadow-lg hover:border-gray-200 transition-all duration-300 overflow-hidden flex flex-col h-full">
         {/* Image */}
         <div className="relative aspect-square bg-gray-50 overflow-hidden">
-          <img
-            src={product.image}
+          <Link to={`/product/${product.id}`} className="block w-full h-full" aria-label={`Открыть товар: ${product.name}`}>
+            <img
+              src={currentImage}
             alt={product.name}
             loading="lazy"
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
@@ -84,8 +115,9 @@ export default function ProductCard({ product, activeColor, initialMemory }) {
                   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400"><rect width="400" height="400" fill="#f3f4f6"/><text x="200" y="200" text-anchor="middle" font-size="16" fill="#9ca3af" font-family="Arial">${product.name}</text></svg>`
                 );
             }}
-          />
-          <div className="absolute top-2 left-2 flex flex-col gap-1">
+            />
+          </Link>
+          <div className="absolute top-2 left-2 flex flex-col gap-1 pointer-events-none">
             {product.isNew && (
               <span className="bg-brand-600 text-white text-xs font-bold px-2 py-1 rounded-md">Новинка</span>
             )}
@@ -102,11 +134,7 @@ export default function ProductCard({ product, activeColor, initialMemory }) {
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              const specs = {};
-              if (selectedColor) specs.Цвет = selectedColor;
-              if (selectedMemory) specs.Память = selectedMemory;
-              if (selectedSim) specs['SIM-конфигурация'] = selectedSim;
-              toggleFavorite(product, specs);
+              toggleFavorite(product, effectiveSpecs);
             }}
             className="absolute bottom-2 right-2 w-9 h-9 flex items-center justify-center bg-white/90 backdrop-blur-sm rounded-full shadow-sm hover:bg-white transition"
             title={isFavorite(product.id) ? 'Убрать из избранного' : 'Добавить в избранное'}
@@ -122,7 +150,9 @@ export default function ProductCard({ product, activeColor, initialMemory }) {
         {/* Info */}
         <div className="p-4 flex flex-col flex-1">
           <h3 className="font-medium text-gray-900 text-sm leading-snug mb-2 line-clamp-2 min-h-[2.5rem]">
-            {product.name}
+            <Link to={`/product/${product.id}`} className="hover:text-brand-600 transition-colors">
+              {product.name}
+            </Link>
           </h3>
 
           {/* Color swatches */}
@@ -186,8 +216,8 @@ export default function ProductCard({ product, activeColor, initialMemory }) {
           {/* Price & cart */}
           <div className="mt-auto">
             <div className="flex items-baseline gap-2 mb-3">
-              <span className="text-lg font-bold text-gray-900">{formatPrice(product.price)}</span>
-              {product.originalPrice && (
+              <span className="text-lg font-bold text-gray-900">{formatPrice(currentPrice)}</span>
+              {product.originalPrice > currentPrice && (
                 <span className="text-sm text-gray-400 line-through">{formatPrice(product.originalPrice)}</span>
               )}
             </div>
@@ -209,18 +239,18 @@ export default function ProductCard({ product, activeColor, initialMemory }) {
             )}
           </div>
         </div>
-      </Link>
+      </article>
     {/* Config modal */}
     {showConfigModal && (
       <>
         <div className="fixed inset-0 bg-black/50 z-50" onClick={() => setShowConfigModal(false)} />
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto animate-[slideIn_0.2s_ease-out]">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Выбор конфигурации товара" onClick={() => setShowConfigModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto animate-[slideIn_0.2s_ease-out]" onClick={(event) => event.stopPropagation()}>
             <div className="sticky top-0 bg-white border-b border-gray-100 px-5 py-4 flex items-center justify-between rounded-t-2xl z-10">
               <h3 className="font-bold text-gray-900 text-base">Выберите конфигурацию</h3>
               <button
                 onClick={() => setShowConfigModal(false)}
-                className="p-1.5 hover:bg-gray-100 rounded-lg transition"
+                className="p-1.5 hover:bg-gray-100 rounded-lg transition" aria-label="Закрыть окно конфигурации"
               >
                 <X size={18} className="text-gray-400" />
               </button>
@@ -230,14 +260,14 @@ export default function ProductCard({ product, activeColor, initialMemory }) {
               {/* Product info */}
               <div className="flex gap-3">
                 <img
-                  src={product.image}
+                  src={currentImage}
                   alt={product.name}
                   className="w-20 h-20 rounded-xl bg-gray-50 object-cover flex-shrink-0"
                 />
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-gray-900">{product.name}</p>
                   <p className="text-lg font-bold text-brand-600 mt-1">
-                    {(product.price * modalQuantity).toLocaleString('ru-RU') + ' ₽'}
+                    {(currentPrice * modalQuantity).toLocaleString('ru-RU') + ' ₽'}
                   </p>
                 </div>
               </div>

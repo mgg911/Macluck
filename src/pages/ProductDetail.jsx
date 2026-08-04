@@ -12,7 +12,7 @@ import { getProductImages, getProductPrice, sanitizeProductSpecs } from '../util
 
 export default function ProductDetail() {
   const { id } = useParams();
-  const { products, categories } = useCatalog();
+  const { products, categories, loading } = useCatalog();
   const { addToCart } = useCart();
   const { isFavorite, toggleFavorite } = useFavorites();
   const [selectedSpecs, setSelectedSpecs] = useState({});
@@ -54,8 +54,12 @@ export default function ProductDetail() {
     setActiveImageIndex(0);
   }, [productId, selectedColor]);
 
+  useEffect(() => {
+    if (activeImageIndex >= galleryImages.length) setActiveImageIndex(0);
+  }, [activeImageIndex, galleryImages.length]);
+
   if (!product) {
-    if (products.length === 0) {
+    if (loading) {
       return (
         <div className="max-w-7xl mx-auto px-4 py-20 text-center">
           <p className="text-gray-500">Загрузка...</p>
@@ -64,6 +68,7 @@ export default function ProductDetail() {
     }
     return (
       <div className="max-w-7xl mx-auto px-4 py-20 text-center">
+        <Seo title="Товар не найден — MacLuck" noindex />
         <h1 className="text-2xl font-bold text-gray-900 mb-4">Товар не найден</h1>
         <Link to="/" className="text-brand-600 hover:underline">Вернуться на главную</Link>
       </div>
@@ -76,8 +81,8 @@ export default function ProductDetail() {
     addToCart(product, effectiveSpecs, quantity);
   };
 
-  const allSelected = product.specs.every(
-    (spec) => spec.options.length === 0 || selectedSpecs[spec.name]
+  const allSelected = (product.specs || []).every(
+    (spec) => spec.options.length === 0 || effectiveSpecs[spec.name]
   );
 
   return (
@@ -171,7 +176,7 @@ export default function ProductDetail() {
                         key={opt.value}
                         onClick={() => setSelectedSpecs({ ...selectedSpecs, [spec.name]: opt.value })}
                         className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 transition ${
-                          selectedSpecs[spec.name] === opt.value
+                          effectiveSpecs[spec.name] === opt.value
                             ? 'border-brand-600 bg-brand-50'
                             : 'border-gray-200 hover:border-gray-300'
                         }`}
@@ -189,7 +194,7 @@ export default function ProductDetail() {
                         key={opt.value}
                         onClick={() => setSelectedSpecs({ ...selectedSpecs, [spec.name]: opt.value })}
                         className={`px-4 py-2.5 rounded-xl border-2 text-sm font-medium transition ${
-                          selectedSpecs[spec.name] === opt.value
+                          effectiveSpecs[spec.name] === opt.value
                             ? 'border-brand-600 bg-brand-50 text-brand-600'
                             : 'border-gray-200 text-gray-600 hover:border-gray-300'
                         }`}
@@ -214,7 +219,7 @@ export default function ProductDetail() {
           <div className="bg-gray-50 rounded-2xl p-5 mb-6">
             <div className="flex items-baseline gap-3 mb-4">
               <span className="text-3xl font-bold text-gray-900">{formatPrice(currentPrice)}</span>
-              {product.originalPrice && (
+              {product.originalPrice > currentPrice && (
                 <span className="text-lg text-gray-400 line-through">{formatPrice(product.originalPrice)}</span>
               )}
               {product.discount && (
@@ -232,7 +237,7 @@ export default function ProductDetail() {
                 </button>
                 <span className="text-sm font-medium w-8 text-center">{quantity}</span>
                 <button
-                  onClick={() => setQuantity(quantity + 1)}
+                  onClick={() => setQuantity(Math.min(99, quantity + 1))}
                   className="p-1 rounded-full hover:bg-gray-100 transition"
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14"/><path d="M12 5v14"/></svg>

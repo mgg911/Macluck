@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { SlidersHorizontal, X, Search } from 'lucide-react';
 import ProductCard from '../components/ProductCard';
 import FilterSidebar from '../components/FilterSidebar';
@@ -345,7 +345,7 @@ export default function Catalog() {
       <Seo title="Каталог — MacLuck" description="Каталог техники и аксессуаров MacLuck" />
       {/* Breadcrumbs */}
       <nav className="flex items-center gap-1 text-sm text-gray-500 mb-4 flex-wrap">
-        <a href="/" className="hover:text-brand-600 transition">Главная</a>
+        <Link to="/" className="hover:text-brand-600 transition">Главная</Link>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m9 18 6-6-6-6"/></svg>
         <span className="text-gray-900 font-medium">Каталог</span>
       </nav>

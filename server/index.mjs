@@ -1,7 +1,7 @@
 import http from 'node:http';
 import { readFile, writeFile, mkdir, stat, unlink } from 'node:fs/promises';
 import { createReadStream } from 'node:fs';
-import { resolve, extname, join, normalize } from 'node:path';
+import { resolve, extname, join, normalize, sep } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomBytes, scryptSync, timingSafeEqual, randomUUID } from 'node:crypto';
 import { products, categories, banners } from '../src/data/products.js';
@@ -18,6 +18,7 @@ if (process.env.NODE_ENV !== 'production') {
 }
 let DATA_FILE = resolve(process.env.DATA_FILE || './data/database.json');
 let UPLOAD_DIR = resolve(process.env.UPLOAD_DIR || './uploads');
+let usingTemporaryStorage = false;
 const DIST_DIR = resolve('./dist');
 const sessions = new Map();
 const attempts = new Map();
@@ -108,6 +109,7 @@ try {
   await mkdir(UPLOAD_DIR, { recursive: true });
 } catch (error) {
   if (error?.code !== 'EACCES' || process.env.DATA_FILE || process.env.UPLOAD_DIR) throw error;
+  usingTemporaryStorage = true;
   const writableRoot = join(tmpdir(), 'macluck');
   DATA_FILE = join(writableRoot, 'database.json');
   UPLOAD_DIR = join(writableRoot, 'uploads');
@@ -178,8 +180,19 @@ async function save() {
   await process.getBuiltinModule('fs/promises').rename(tmp, DATA_FILE);
 }
 
+function responseHeaders(extra = {}) {
+  return {
+    'x-content-type-options': 'nosniff',
+    'x-frame-options': 'DENY',
+    'referrer-policy': 'strict-origin-when-cross-origin',
+    'permissions-policy': 'camera=(), microphone=(), geolocation=()',
+    ...(process.env.NODE_ENV === 'production' ? { 'strict-transport-security': 'max-age=31536000; includeSubDomains' } : {}),
+    ...extra,
+  };
+}
+
 function json(res, status, data, extra = {}) {
-  res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', ...extra });
+  res.writeHead(status, responseHeaders({ 'content-type': 'application/json; charset=utf-8', ...extra }));
   res.end(JSON.stringify(data));
 }
 
@@ -204,7 +217,9 @@ async function body(req, limit = 2_000_000) {
     if (size > limit) throw Object.assign(new Error('Payload too large'), { status: 413 });
     chunks.push(chunk);
   }
-  return chunks.length ? JSON.parse(Buffer.concat(chunks).toString('utf8')) : {};
+  if (!chunks.length) return {};
+  try { return JSON.parse(Buffer.concat(chunks).toString('utf8')); }
+  catch { throw Object.assign(new Error('Некорректный JSON'), { status: 400 }); }
 }
 
 function secureEqual(a, b) {
@@ -228,6 +243,53 @@ function cleanRecord(value) {
     if (typeof val === 'string') return val.trim();
     return val;
   }));
+}
+
+function validateAdminRecord(collection, value, currentId = null) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw Object.assign(new Error('Данные записи должны быть объектом'), { status: 400 });
+  }
+  const required = {
+    products: ['name'],
+    categories: ['name', 'slug'],
+    filters: ['name', 'slug'],
+    news: ['title', 'slug'],
+    banners: ['title'],
+    legal: ['title', 'slug'],
+  }[collection] || [];
+  if (required.some(field => !String(value[field] || '').trim())) {
+    throw Object.assign(new Error('Заполните обязательные поля записи'), { status: 400 });
+  }
+  if (value.slug && db[collection]?.some(item => String(item.id) !== String(currentId) && item.slug === value.slug)) {
+    throw Object.assign(new Error('Запись с таким slug уже существует'), { status: 409 });
+  }
+  if (collection === 'products') {
+    if (!Number.isFinite(Number(value.price)) || Number(value.price) < 0) {
+      throw Object.assign(new Error('Укажите корректную цену товара'), { status: 400 });
+    }
+    if (!Array.isArray(value.specs) || value.specs.some(spec => !spec?.name || !Array.isArray(spec.options))) {
+      throw Object.assign(new Error('Характеристики товара заполнены некорректно'), { status: 400 });
+    }
+    if (value.images != null && !Array.isArray(value.images)) {
+      throw Object.assign(new Error('Галерея товара должна быть списком'), { status: 400 });
+    }
+    if (value.colorImages != null && (typeof value.colorImages !== 'object' || Array.isArray(value.colorImages) || Object.values(value.colorImages).some(images => !Array.isArray(images)))) {
+      throw Object.assign(new Error('Фотографии цветов заполнены некорректно'), { status: 400 });
+    }
+  }
+  if (collection === 'categories' && value.children != null && !Array.isArray(value.children)) {
+    throw Object.assign(new Error('Подкатегории должны быть списком'), { status: 400 });
+  }
+  if (collection === 'filters' && value.values != null && !Array.isArray(value.values)) {
+    throw Object.assign(new Error('Значения фильтра должны быть списком'), { status: 400 });
+  }
+  if (collection === 'banners' && value.link) {
+    const link = String(value.link).trim();
+    if (!link.startsWith('/') || link.startsWith('//')) {
+      throw Object.assign(new Error('Ссылка баннера должна вести на внутреннюю страницу сайта'), { status: 400 });
+    }
+  }
+  return value;
 }
 
 async function telegram(order) {
@@ -278,16 +340,22 @@ async function route(req, res) {
   if (path === '/api/health') return json(res, 200, { ok: true });
   if (path === '/robots.txt') {
     const base = db.settings.seo.publicUrl;
-    res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8' });
+    res.writeHead(200, responseHeaders({ 'content-type': 'text/plain; charset=utf-8' }));
     return res.end(`User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /cart\nDisallow: /search\nSitemap: ${base}/sitemap.xml\n`);
   }
   if (path === '/sitemap.xml') {
     const base = db.settings.seo.publicUrl.replace(/\/$/, '');
-    const paths = ['', '/catalog', '/news', '/about', '/delivery',
-      ...db.products.map(p => `/product/${p.slug || p.id}`),
-      ...db.news.map(n => `/news/${n.slug || n.id}`),
-      ...db.legal.map(d => `/legal/${d.slug}`)];
-    res.writeHead(200, { 'content-type': 'application/xml; charset=utf-8' });
+    const paths = [...new Set([
+      '', '/catalog', '/news', '/about', '/delivery', '/clearance',
+      ...db.categories.filter(item => item.published !== false).flatMap(category => [
+        `/brand/${encodeURIComponent(category.slug || category.name)}`,
+        ...(category.children || []).filter(item => item.published !== false).map(child => `/brand/${encodeURIComponent(child.slug || child.name)}`),
+      ]),
+      ...db.products.filter(item => item.published !== false).map(product => `/product/${encodeURIComponent(product.slug || product.id)}`),
+      ...db.news.filter(item => item.published !== false).map(article => `/news/${encodeURIComponent(article.slug || article.id)}`),
+      ...db.legal.filter(item => item.published !== false).map(document => `/legal/${encodeURIComponent(document.slug)}`),
+    ])];
+    res.writeHead(200, responseHeaders({ 'content-type': 'application/xml; charset=utf-8' }));
     return res.end(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${paths.map(p => `<url><loc>${base}${p}</loc></url>`).join('')}</urlset>`);
   }
   if (path === '/api/public') {
@@ -322,7 +390,14 @@ async function route(req, res) {
   if (path === '/api/orders' && req.method === 'POST') {
     if (rateLimited(req, 'order', 5, 10 * 60_000)) return json(res, 429, { error: 'Слишком много заявок. Попробуйте позже.' });
     const data = cleanRecord(await body(req));
-    if (!data.consent || !data.customer?.name || !/^[+\d()\-\s]{7,24}$/.test(data.customer.phone || '') || !Array.isArray(data.items) || !data.items.length) {
+    const validPhone = /^(?=(?:.*[0-9]){7})[+0-9() -]{7,24}$/i.test(data.customer?.phone || '');
+    const validDelivery = data.deliveryMethod === 'courier'
+      ? Boolean(data.customer?.name && data.customer?.city && data.customer?.address)
+      : data.deliveryMethod === 'cdek'
+        ? Boolean(data.customer?.name && data.customer?.surname && data.customer?.pickupAddress)
+        : false;
+    const customerFieldsValid = Object.values(data.customer || {}).every(value => typeof value === 'string' && value.length <= 300);
+    if (!data.consent || !validPhone || !validDelivery || !customerFieldsValid || !Array.isArray(data.items) || !data.items.length || data.items.length > 100) {
       return json(res, 400, { error: 'Проверьте обязательные поля заказа' });
     }
     const calculated = [];
@@ -343,7 +418,7 @@ async function route(req, res) {
     if (duplicate) return json(res, 200, { number: duplicate.number, total: duplicate.total, duplicate: true });
     const order = {
       id: randomUUID(),
-      number: `ML-${new Date().toISOString().slice(0, 10).replaceAll('-', '')}-${String(db.orders.length + 1).padStart(4, '0')}`,
+      number: `ML-${new Date().toISOString().slice(0, 10).replaceAll('-', '')}-${randomBytes(3).toString('hex').toUpperCase()}`,
       status: 'new', createdAt: new Date().toISOString(),
       customer: data.customer, deliveryMethod: data.deliveryMethod,
       items: calculated, total: calculated.reduce((sum, i) => sum + i.price * i.quantity, 0),
@@ -362,17 +437,20 @@ async function route(req, res) {
       ...db,
       system: {
         telegramConfigured: Boolean(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID),
+        persistentStorage: !usingTemporaryStorage,
       },
     });
   }
   if (path === '/api/admin/settings' && req.method === 'PUT') {
-    db.settings = { ...db.settings, ...cleanRecord(await body(req)) }; await save(); return json(res, 200, db.settings);
+    const updates = cleanRecord(await body(req));
+    if (!updates || typeof updates !== 'object' || Array.isArray(updates)) return json(res, 400, { error: 'Некорректные настройки' });
+    db.settings = { ...db.settings, ...updates }; await save(); return json(res, 200, db.settings);
   }
   if (path === '/api/admin/upload' && req.method === 'POST') {
     const data = await body(req, 8_000_000);
-    const match = String(data.data || '').match(/^data:(image\/(?:png|jpeg|webp|svg\+xml));base64,(.+)$/);
-    if (!match) return json(res, 400, { error: 'Разрешены PNG, JPEG, WEBP и SVG' });
-    const ext = { 'image/png': '.png', 'image/jpeg': '.jpg', 'image/webp': '.webp', 'image/svg+xml': '.svg' }[match[1]];
+    const match = String(data.data || '').match(/^data:(image\/(?:png|jpeg|webp));base64,(.+)$/);
+    if (!match) return json(res, 400, { error: 'Разрешены только PNG, JPEG и WEBP' });
+    const ext = { 'image/png': '.png', 'image/jpeg': '.jpg', 'image/webp': '.webp' }[match[1]];
     const name = `${randomUUID()}${ext}`;
     await writeFile(join(UPLOAD_DIR, name), Buffer.from(match[2], 'base64'));
     return json(res, 201, { url: `/uploads/${name}` });
@@ -381,7 +459,7 @@ async function route(req, res) {
     const data = await body(req);
     if (!String(data.url || '').startsWith('/uploads/')) return json(res, 400, { error: 'Можно удалить только загруженный файл' });
     const target = normalize(join(UPLOAD_DIR, data.url.slice(9)));
-    if (!target.startsWith(UPLOAD_DIR)) return json(res, 403, { error: 'Недопустимый путь' });
+    if (target !== UPLOAD_DIR && !target.startsWith(UPLOAD_DIR + sep)) return json(res, 403, { error: 'Недопустимый путь' });
     await unlink(target).catch(() => {});
     return json(res, 200, { ok: true });
   }
@@ -391,12 +469,15 @@ async function route(req, res) {
     if (req.method === 'GET') return json(res, 200, db[collection]);
     if (req.method === 'POST') {
       const item = { ...cleanRecord(await body(req)), id: randomUUID() };
+      validateAdminRecord(collection, item);
       db[collection].unshift(item); await save(); return json(res, 201, item);
     }
     const index = db[collection].findIndex(item => String(item.id) === decodeURIComponent(id));
     if (index < 0) return json(res, 404, { error: 'Запись не найдена' });
     if (req.method === 'PUT') {
-      db[collection][index] = { ...db[collection][index], ...cleanRecord(await body(req)), id: db[collection][index].id };
+      const updated = { ...db[collection][index], ...cleanRecord(await body(req)), id: db[collection][index].id };
+      validateAdminRecord(collection, updated, updated.id);
+      db[collection][index] = updated;
       await save(); return json(res, 200, db[collection][index]);
     }
     if (req.method === 'DELETE') {
@@ -406,12 +487,47 @@ async function route(req, res) {
   return json(res, 404, { error: 'API endpoint не найден' });
 }
 
+function matchesRouteValue(item, value) {
+  const normalized = String(value || '').toLowerCase();
+  return String(item?.slug || '').toLowerCase() === normalized || String(item?.name || '').toLowerCase() === normalized;
+}
+
+function isKnownPage(path) {
+  const parts = path.split('/').filter(Boolean);
+  if (!parts.length) return true;
+  try {
+    const section = parts[0];
+    const first = decodeURIComponent(parts[1] || '');
+    const second = decodeURIComponent(parts[2] || '');
+    if (section === 'admin') return true;
+    if (parts.length === 2 && section === 'product') {
+      return db.products.some(item => item.published !== false && (String(item.id) === first || item.slug === first));
+    }
+    if (parts.length === 2 && section === 'news') {
+      return db.news.some(item => item.published !== false && (String(item.id) === first || item.slug === first));
+    }
+    if (parts.length === 2 && section === 'legal') {
+      return db.legal.some(item => item.published !== false && item.slug === first);
+    }
+    if (parts.length === 2 && section === 'brand') {
+      return db.categories.some(category => category.published !== false && (
+        matchesRouteValue(category, first) || (category.children || []).some(child => child.published !== false && matchesRouteValue(child, first))
+      ));
+    }
+    if (parts.length === 3 && section === 'category') {
+      const category = db.categories.find(item => item.published !== false && matchesRouteValue(item, first));
+      return Boolean(category && (category.children || []).some(child => child.published !== false && matchesRouteValue(child, second)));
+    }
+  } catch {}
+  return false;
+}
+
 async function serveStatic(path, res) {
   const upload = path.startsWith('/uploads/');
   const root = upload ? UPLOAD_DIR : DIST_DIR;
   let target = normalize(join(root, upload ? path.slice(9) : path === '/' ? 'index.html' : path.slice(1)));
   let statusCode = 200;
-  if (!target.startsWith(root)) return json(res, 403, { error: 'Forbidden' });
+  if (target !== root && !target.startsWith(root + sep)) return json(res, 403, { error: 'Forbidden' });
   try {
     const info = await stat(target);
     if (info.isDirectory()) target = join(target, 'index.html');
@@ -419,8 +535,7 @@ async function serveStatic(path, res) {
     if (!upload) {
       target = join(DIST_DIR, 'index.html');
       const knownStatic = ['/', '/catalog', '/news', '/about', '/delivery', '/cart', '/search', '/favorites', '/clearance'];
-      const knownDynamic = /^\/(product|news|brand|category|legal|admin)(\/|$)/.test(path);
-      statusCode = knownStatic.includes(path) || knownDynamic ? 200 : 404;
+      statusCode = knownStatic.includes(path) || isKnownPage(path) ? 200 : 404;
     }
   }
   try {
@@ -431,16 +546,18 @@ async function serveStatic(path, res) {
       : path.startsWith('/assets/')
         ? 'public, max-age=31536000, immutable'
         : 'public, max-age=3600';
-    res.writeHead(statusCode, {
+    await stat(target);
+    res.writeHead(statusCode, responseHeaders({
       'content-type': types[extension] || 'application/octet-stream',
       'cache-control': cacheControl,
-    });
+    }));
     createReadStream(target).pipe(res);
   } catch { json(res, 404, { error: 'Not found' }); }
 }
 
 export const server = http.createServer((req, res) => route(req, res).catch(error => {
-  console.error(error);
-  json(res, error.status || 500, { error: error.status ? error.message : 'Внутренняя ошибка сервера' });
+  const status = error.status || 500;
+  if (status >= 500) console.error(error);
+  json(res, status, { error: error.status ? error.message : 'Внутренняя ошибка сервера' });
 }));
 server.listen(PORT, () => console.log(`MacLuck server: http://localhost:${PORT}`));

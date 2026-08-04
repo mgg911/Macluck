@@ -1,4 +1,6 @@
+// oxlint-disable react/only-export-components
 import { createContext, useContext, useReducer, useEffect, useState } from 'react';
+import { useCatalog } from './CatalogContext';
 
 const STORAGE_KEY = 'macluck_favorites';
 
@@ -17,6 +19,11 @@ function favoritesReducer(state, action) {
       return state.filter((f) => f.id !== action.id);
     case 'LOAD':
       return action.items;
+    case 'SYNC_CATALOG':
+      return state.flatMap((favorite) => {
+        const product = action.products.find((candidate) => String(candidate.id) === String(favorite.id));
+        return product ? [{ ...product, selectedSpecs: favorite.selectedSpecs || {} }] : [];
+      });
     default:
       return state;
   }
@@ -32,6 +39,7 @@ function loadFavorites() {
 }
 
 export function FavoritesProvider({ children }) {
+  const { products } = useCatalog();
   const [favorites, dispatch] = useReducer(favoritesReducer, []);
   const [isLoaded, setIsLoaded] = useState(false);
 
@@ -48,6 +56,10 @@ export function FavoritesProvider({ children }) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(favorites));
     }
   }, [favorites, isLoaded]);
+
+  useEffect(() => {
+    if (isLoaded && products.length) dispatch({ type: 'SYNC_CATALOG', products });
+  }, [isLoaded, products]);
 
   const toggleFavorite = (product, specs) => dispatch({ type: 'TOGGLE', product, specs });
   const removeFromFavorites = (id) => dispatch({ type: 'REMOVE', id });

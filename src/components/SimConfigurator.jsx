@@ -1,8 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { getSimConfigForProduct } from '../data/simConfig';
 
 export default function SimConfigurator({ product, selectedSim, onChange, compact }) {
-  const options = getSimConfigForProduct(product.id);
+  const options = useMemo(() => getSimConfigForProduct(product.id), [product.id]);
   const currentValue = selectedSim || options?.[0];
 
   // Auto-select on mount

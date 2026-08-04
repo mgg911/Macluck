@@ -6,7 +6,7 @@ import { api } from '../lib/api';
 import Seo from '../components/Seo';
 
 export default function CartPage() {
-  const { items, removeFromCart, updateQuantity, totalPrice } = useCart();
+  const { items, removeFromCart, updateQuantity, clearCart, totalPrice } = useCart();
   const formatPrice = (p) => p.toLocaleString('ru-RU') + ' ₽';
 
   const [deliveryMethod, setDeliveryMethod] = useState('courier');
@@ -38,6 +38,7 @@ export default function CartPage() {
         },
       });
       setOrderNumber(result.number);
+      clearCart();
       setSubmitted(true);
     } catch (error) {
       setSubmitError(error.message);
@@ -259,9 +260,9 @@ export default function CartPage() {
                 />
                 <span className="text-xs text-gray-500 leading-relaxed group-hover:text-gray-700 transition">
                   Я согласен на{' '}
-                  <a href="#" className="text-brand-600 hover:underline" onClick={(e) => e.stopPropagation()}>
+                  <Link to="/legal/consent" className="text-brand-600 hover:underline" onClick={(e) => e.stopPropagation()}>
                     обработку персональных данных
-                  </a>
+                  </Link>
                 </span>
               </label>
 

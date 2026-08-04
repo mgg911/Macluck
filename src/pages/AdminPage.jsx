@@ -128,7 +128,7 @@ function ProductVariantEditor({ product, onChange, setError, uploading, setUploa
                   <input
                     type="file"
                     multiple
-                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                    accept="image/png,image/jpeg,image/webp"
                     disabled={uploading}
                     onChange={(event) => uploadColorImages(option.value, [...(event.target.files || [])])}
                     className="sr-only"
@@ -243,7 +243,7 @@ function Editor({ section, value, onClose, onSaved }) {
       </details>
       {['products', 'news', 'banners'].includes(section) && <label className="block mt-3 text-sm">
         Загрузить изображение
-        <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={upload} disabled={uploading} className="block mt-1" />
+        <input type="file" accept="image/png,image/jpeg,image/webp" onChange={upload} disabled={uploading} className="block mt-1" />
         <button type="button" onClick={removeImage} className="mt-2 text-red-600">Удалить текущее изображение</button>
       </label>}
       <div className="flex justify-end gap-3 mt-5">
@@ -280,10 +280,10 @@ function Settings({ value, onSaved }) {
     <textarea value={text} onChange={e => setText(e.target.value)} className="w-full h-[520px] font-mono text-sm border rounded-xl p-4" />
     <div className="grid sm:grid-cols-2 gap-3 mt-3">
       <label className="border rounded-lg p-3 text-sm">Загрузить логотип
-        <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={e => uploadSetting('logo', e.target.files?.[0])} className="block mt-2" />
+        <input type="file" accept="image/png,image/jpeg,image/webp" onChange={e => uploadSetting('logo', e.target.files?.[0])} className="block mt-2" />
       </label>
       <label className="border rounded-lg p-3 text-sm">Загрузить favicon
-        <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={e => uploadSetting('favicon', e.target.files?.[0])} className="block mt-2" />
+        <input type="file" accept="image/png,image/jpeg,image/webp" onChange={e => uploadSetting('favicon', e.target.files?.[0])} className="block mt-2" />
       </label>
     </div>
     <button onClick={save} className="mt-3 px-5 py-2.5 bg-brand-600 text-white rounded-lg">Сохранить настройки</button>
@@ -324,6 +324,9 @@ export default function AdminPage() {
     {error && <p className="bg-red-50 text-red-700 p-3 rounded-lg mb-4">{error}</p>}
     {snapshot?.system && <p className={`p-3 rounded-lg mb-4 text-sm ${snapshot.system.telegramConfigured ? 'bg-green-50 text-green-800' : 'bg-amber-50 text-amber-900'}`}>
       Telegram-уведомления: {snapshot.system.telegramConfigured ? 'настроены' : 'не настроены — добавьте TELEGRAM_BOT_TOKEN и TELEGRAM_CHAT_ID в переменные Timeweb'}
+    </p>}
+    {snapshot?.system?.persistentStorage === false && <p className="p-3 rounded-lg mb-4 text-sm bg-red-50 text-red-800">
+      Постоянное хранилище не подключено: изменения каталога, изображения и заказы могут исчезнуть после нового деплоя.
     </p>}
     <div className="grid lg:grid-cols-[220px_1fr] gap-6">
       <nav className="bg-white border rounded-2xl p-2 h-fit" aria-label="Разделы админ-панели">

@@ -1,7 +1,24 @@
+import { useMemo } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Award, ChevronRight, Clock3, PackageCheck, ShieldCheck, Sparkles, Truck } from 'lucide-react';
 import { useSite } from '../context/SiteContext';
 import Seo from '../components/Seo';
+
+function sanitizeContent(html) {
+  const documentCopy = new DOMParser().parseFromString(String(html || ''), 'text/html');
+  documentCopy.querySelectorAll('script, iframe, object, embed, form, link, meta').forEach((node) => node.remove());
+  documentCopy.querySelectorAll('*').forEach((node) => {
+    [...node.attributes].forEach((attribute) => {
+      const name = attribute.name.toLowerCase();
+      const value = attribute.value.trim().toLowerCase();
+      if (name.startsWith('on') || name === 'srcdoc') node.removeAttribute(attribute.name);
+      if (['href', 'src', 'xlink:href'].includes(name) && (value.startsWith('javascript:') || value.startsWith('data:text/html'))) {
+        node.removeAttribute(attribute.name);
+      }
+    });
+  });
+  return documentCopy.body.innerHTML;
+}
 
 const fixed = {
   about: ['О компании', 'about'],
@@ -40,9 +57,17 @@ export default function ContentPage({ type }) {
   const title = fixedPage?.[0] || legal?.title || 'Документ';
   const content = fixedPage ? data?.settings?.[fixedPage[1]] : legal?.content;
   const meta = pageMeta[key];
+  const safeContent = useMemo(() => sanitizeContent(content || '<h1>' + title + '</h1>'), [content, title]);
 
   if (error) return <div className="max-w-4xl mx-auto p-8 text-red-600">{error}</div>;
   if (!data) return <div className="max-w-4xl mx-auto p-8">Загрузка…</div>;
+  if (!fixedPage && !legal) {
+    return <div className="max-w-4xl mx-auto px-4 py-20 text-center">
+      <Seo title="Документ не найден — MacLuck" noindex />
+      <h1 className="text-2xl font-bold text-gray-900 mb-4">Документ не найден</h1>
+      <Link to="/" className="text-brand-600 hover:underline">Вернуться на главную</Link>
+    </div>;
+  }
 
   return (
     <main className="bg-slate-50 min-h-[70vh] pb-16 md:pb-24">
@@ -78,7 +103,7 @@ export default function ContentPage({ type }) {
         )}
 
         <article className="bg-white border border-slate-200 rounded-3xl shadow-sm px-5 py-7 sm:px-8 md:px-14 md:py-12">
-          <div className="content-rich" dangerouslySetInnerHTML={{ __html: content || `<h1>${title}</h1>` }} />
+          <div className="content-rich" dangerouslySetInnerHTML={{ __html: safeContent }} />
         </article>
       </div>
     </main>

@@ -1,3 +1,5 @@
+import { getSimConfigForProduct } from '../data/simConfig.js';
+
 const asPrice = (value) => {
   if (value === '' || value == null) return null;
   const price = Number(value);
@@ -34,6 +36,10 @@ export function sanitizeProductSpecs(product, selectedSpecs = {}) {
     if (selected != null && allowed.has(String(selected))) result[spec.name] = String(selected);
     else if (spec.options?.[0]?.value != null) result[spec.name] = String(spec.options[0].value);
   }
-  if (selectedSpecs?.['SIM-конфигурация']) result['SIM-конфигурация'] = String(selectedSpecs['SIM-конфигурация']);
+  const simOptions = product?.id ? getSimConfigForProduct(product.id) : null;
+  if (simOptions?.length) {
+    const selectedSim = String(selectedSpecs?.['SIM-конфигурация'] || '');
+    result['SIM-конфигурация'] = simOptions.includes(selectedSim) ? selectedSim : simOptions[0];
+  }
   return result;
 }

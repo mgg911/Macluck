@@ -3,15 +3,24 @@ import { useLocation } from 'react-router-dom';
 import { useSite } from '../context/SiteContext';
 
 function setMeta(name, content, property = false) {
-  if (!content) return;
   const key = property ? 'property' : 'name';
   let node = document.head.querySelector(`meta[${key}="${name}"]`);
+  if (!content) {
+    node?.remove();
+    return;
+  }
   if (!node) {
     node = document.createElement('meta');
     node.setAttribute(key, name);
     document.head.appendChild(node);
   }
   node.content = content;
+}
+
+function absoluteUrl(value, base) {
+  if (!value) return '';
+  try { return new URL(value, base).toString(); }
+  catch { return ''; }
 }
 
 export default function Seo({ title, description, image, noindex = false, schema }) {
@@ -22,7 +31,7 @@ export default function Seo({ title, description, image, noindex = false, schema
     const finalTitle = title || defaults.title || 'MacLuck';
     const finalDescription = description || defaults.description || '';
     const base = defaults.publicUrl || window.location.origin;
-    const canonical = new URL(pathname, base).toString();
+    const canonical = absoluteUrl(pathname, base) || window.location.href;
     document.title = finalTitle;
     setMeta('description', finalDescription);
     setMeta('robots', noindex ? 'noindex,nofollow' : 'index,follow');
@@ -30,7 +39,7 @@ export default function Seo({ title, description, image, noindex = false, schema
     setMeta('og:description', finalDescription, true);
     setMeta('og:url', canonical, true);
     setMeta('og:type', 'website', true);
-    if (image) setMeta('og:image', new URL(image, base).toString(), true);
+    setMeta('og:image', absoluteUrl(image, base), true);
     let link = document.head.querySelector('link[rel="canonical"]');
     if (!link) { link = document.createElement('link'); link.rel = 'canonical'; document.head.appendChild(link); }
     link.href = canonical;

@@ -2,9 +2,21 @@ import { MapPin, Truck, Wallet } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useSite } from '../context/SiteContext';
 
+function safeExternalUrl(value) {
+  try {
+    const url = new URL(String(value));
+    return ['https:', 'http:'].includes(url.protocol) ? url.toString() : '';
+  } catch {
+    return '';
+  }
+}
+
 export default function Footer() {
   const { data } = useSite();
   const settings = data?.settings || {};
+  const socialLinks = Object.entries(settings.social || {})
+    .map(([name, value]) => [name, safeExternalUrl(value)])
+    .filter(([, url]) => url);
   return (
     <footer className="bg-gray-900 text-gray-300 mt-16">
       <div className="max-w-7xl mx-auto px-4 py-12 grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -38,7 +50,7 @@ export default function Footer() {
             <p>ОГРНИП {settings.business.ogrnip}</p>
           </div>}
           <div className="flex flex-wrap gap-3 mt-4 text-sm">
-            {Object.entries(settings.social || {}).filter(([, url]) => url).map(([name, url]) => <a key={name} href={url} target="_blank" rel="noreferrer" className="hover:text-white">{{ telegram: 'Telegram', vk: 'VK', whatsapp: 'WhatsApp' }[name] || name}</a>)}
+            {socialLinks.map(([name, url]) => <a key={name} href={url} target="_blank" rel="noopener noreferrer" className="hover:text-white">{{ telegram: 'Telegram', vk: 'VK', whatsapp: 'WhatsApp' }[name] || name}</a>)}
           </div>
         </div>
         <div className="md:col-span-2 flex flex-wrap gap-x-5 gap-y-2 text-sm border-t border-gray-800 pt-5">

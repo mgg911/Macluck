@@ -17,12 +17,12 @@ export default function Favorites() {
       <div className="flex items-center gap-2 mb-6">
         <Heart size={24} className="text-brand-600" />
         <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Избранное</h1>
-        {favorites.length > 0 && (
-          <span className="text-sm text-gray-500 mt-1">({favorites.length})</span>
+        {favoriteProducts.length > 0 && (
+          <span className="text-sm text-gray-500 mt-1">({favoriteProducts.length})</span>
         )}
       </div>
 
-      {favorites.length === 0 ? (
+      {favoriteProducts.length === 0 ? (
         <div className="text-center py-20">
           <Heart size={48} className="mx-auto text-gray-200 mb-4" />
           <p className="text-gray-500 mb-4">В избранном пока нет товаров</p>

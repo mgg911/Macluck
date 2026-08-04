@@ -7,7 +7,7 @@ import Seo from '../components/Seo';
 
 export default function BrandPage() {
   const { brand, subcategory } = useParams();
-  const { products, categories } = useCatalog();
+  const { products, categories, loading } = useCatalog();
   const [sort, setSort] = useState('popular');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSubcategory, setActiveSubcategory] = useState(null);
@@ -71,11 +71,19 @@ export default function BrandPage() {
     return result;
   }, [catProducts, sort, searchQuery, hasChildren, activeSubcategory, category]);
 
-  if (products.length === 0) {
+  if (loading) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 py-20 text-center">        <p className="text-gray-500">Загрузка...</p>
+      </div>
+    );
+  }
+
+  if (!category) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-20 text-center">
         <Seo title="Категория не найдена — MacLuck" noindex />
-        <p className="text-gray-500">Загрузка...</p>
+        <h1 className="text-2xl font-bold text-gray-900 mb-4">Категория не найдена</h1>
+        <Link to="/catalog" className="text-brand-600 hover:underline">Вернуться в каталог</Link>
       </div>
     );
   }

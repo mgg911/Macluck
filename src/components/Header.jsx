@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ShoppingCart, Heart, Menu, X, Search, Truck, ChevronRight, Package } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useFavorites } from '../context/FavoritesContext';
@@ -125,8 +125,9 @@ export default function Header() {
   const { data: siteData } = useSite();
   const { totalItems, setIsOpen } = useCart();
   const { favoritesCount } = useFavorites();
-  const { products } = useCatalog();
+  const { products, categories } = useCatalog();
   const { pathname } = useLocation();
+  const navigate = useNavigate();
   const [mobileMenu, setMobileMenu] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -137,6 +138,15 @@ export default function Header() {
   const catalogRef = useRef(null);
   const searchRef = useRef(null);
   const hoverTimeout = useRef(null);
+  const menuSections = useMemo(() => categories.length ? categories.map((category) => ({
+    id: category.slug,
+    label: category.name,
+    href: `/brand/${category.slug}`,
+    children: (category.children || []).map((child) => ({
+      label: child.name,
+      href: `/brand/${child.slug}`,
+    })),
+  })) : catalogMenu, [categories]);
 
   // Live search results
   const searchResults = useMemo(() => {
@@ -147,9 +157,9 @@ export default function Header() {
         const description = p.description?.toLowerCase() || '';
         const techText = p.techSpecs?.map((t) => t.value?.toLowerCase() || '').join(' ') || '';
         return (
-          p.name.toLowerCase().includes(q) ||
-          p.brand.toLowerCase().includes(q) ||
-          p.subcategory.toLowerCase().includes(q) ||
+          String(p.name || '').toLowerCase().includes(q) ||
+          String(p.brand || '').toLowerCase().includes(q) ||
+          String(p.subcategory || '').toLowerCase().includes(q) ||
           description.includes(q) ||
           techText.includes(q)
         );
@@ -191,14 +201,14 @@ export default function Header() {
     e.preventDefault();
     setSearchFocused(false);
     if (searchQuery.trim()) {
-      window.location.href = `/search?q=${encodeURIComponent(searchQuery.trim())}`;
+      navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
     }
   };
 
   const navigateToProduct = (id) => {
     setSearchQuery('');
     setSearchFocused(false);
-    window.location.href = `/product/${id}`;
+    navigate(`/product/${id}`);
   };
 
   const formatPrice = (price) => {
@@ -281,7 +291,7 @@ export default function Header() {
                   Все товары
                 </Link>
                 <div className="border-t border-gray-100 my-2 mx-4" />
-                {catalogMenu.map((section) => {
+                {menuSections.map((section) => {
                   const active = isCategoryActive(section, pathname);
                   const isHovered = hoveredSection === section.id;
                   return (
@@ -330,7 +340,7 @@ export default function Header() {
               {/* Right column — subcategories */}
               <div className="flex-1 py-4 px-5 min-h-[280px]">
                 {hoveredSection && (() => {
-                  const section = catalogMenu.find((s) => s.id === hoveredSection);
+                  const section = menuSections.find((s) => s.id === hoveredSection);
                   if (!section) return null;
                   return (
                     <div key={section.id}>
@@ -525,7 +535,7 @@ export default function Header() {
               Все товары
             </Link>
 
-            {catalogMenu.map((section) => {
+            {menuSections.map((section) => {
               const isExpanded = expandedSection === section.id;
               const active = isCategoryActive(section, pathname);
               return (

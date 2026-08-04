@@ -10,16 +10,20 @@ export default function NewsArticle() {
   const news = data?.news || [];
   const article = news.find((a) => String(a.id) === id || a.slug === id);
 
+  if (!data) return <div className="max-w-3xl mx-auto px-4 py-20 text-center text-gray-500">Загрузка…</div>;
+
   if (!article) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-20 text-center">
+        <Seo title="Статья не найдена — MacLuck" noindex />
         <h1 className="text-2xl font-bold text-gray-900 mb-4">Статья не найдена</h1>
         <Link to="/news" className="text-brand-600 hover:underline">Вернуться к новостям</Link>
       </div>
     );
   }
 
-  const dateStr = new Date(article.date).toLocaleDateString('ru-RU', {
+  const articleDate = new Date(article.date);
+  const dateStr = Number.isNaN(articleDate.getTime()) ? '' : articleDate.toLocaleDateString('ru-RU', {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
@@ -77,7 +81,7 @@ export default function NewsArticle() {
 
         {/* Content */}
         <div className="prose prose-gray max-w-none">
-          {article.content.split('\n\n').map((paragraph, idx) => (
+          {(article.content || '').split('\n\n').filter(Boolean).map((paragraph, idx) => (
             <p key={idx} className="text-base text-gray-700 leading-relaxed mb-5">
               {paragraph.trim()}
             </p>

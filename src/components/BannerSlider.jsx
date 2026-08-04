@@ -9,6 +9,10 @@ export default function BannerSlider({ banners }) {
   const prev = () => setCurrent((i) => (i - 1 + banners.length) % banners.length);
 
   useEffect(() => {
+    setCurrent((index) => banners.length ? Math.min(index, banners.length - 1) : 0);
+  }, [banners.length]);
+
+  useEffect(() => {
     if (banners.length <= 1) return;
     const interval = setInterval(() => setCurrent((i) => (i + 1) % banners.length), 5000);
     return () => clearInterval(interval);
@@ -16,13 +20,18 @@ export default function BannerSlider({ banners }) {
 
   if (banners.length === 0) return null;
 
+  const safeLink = (value) => {
+    const target = String(value || '').trim();
+    return target.startsWith('/') && !target.startsWith('//') ? target : '/catalog';
+  };
+
   return (
     <div className="relative w-full overflow-hidden rounded-2xl shadow-lg">
       <div className="relative aspect-[3/1] sm:aspect-[4/1] max-h-[280px] min-h-[120px]">
         {banners.map((banner, idx) => (
           <Link
             key={banner.id}
-            to={banner.link?.trim() || '/catalog'}
+            to={safeLink(banner.link)}
             className={`absolute inset-0 transition-opacity duration-700 bg-gradient-to-br ${banner.gradient} ${
               idx === current ? 'opacity-100 z-10' : 'opacity-0 z-0'
             }`}
@@ -53,6 +62,7 @@ export default function BannerSlider({ banners }) {
         <>
           <button
             onClick={prev}
+            aria-label="Предыдущий баннер"
             className="absolute left-1 sm:left-2 top-1/2 -translate-y-1/2 z-20 p-1.5 sm:p-2 rounded-full bg-white/20 hover:bg-white/40 backdrop-blur-sm transition"
           >
             <ChevronLeft size={18} className="text-white sm:hidden" />
@@ -60,6 +70,7 @@ export default function BannerSlider({ banners }) {
           </button>
           <button
             onClick={next}
+            aria-label="Следующий баннер"
             className="absolute right-1 sm:right-2 top-1/2 -translate-y-1/2 z-20 p-1.5 sm:p-2 rounded-full bg-white/20 hover:bg-white/40 backdrop-blur-sm transition"
           >
             <ChevronRight size={18} className="text-white sm:hidden" />

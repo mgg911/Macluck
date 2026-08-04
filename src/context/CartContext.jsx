@@ -1,3 +1,4 @@
+// oxlint-disable react/only-export-components
 import { createContext, useContext, useReducer, useState, useEffect } from 'react';
 import { getProductImages, getProductPrice, sanitizeProductSpecs } from '../utils/productVariants';
 import { useCatalog } from './CatalogContext';
@@ -5,6 +6,8 @@ import { useCatalog } from './CatalogContext';
 const STORAGE_KEY = 'macluck_cart';
 
 const CartContext = createContext();
+
+const clampQuantity = (value) => Math.max(1, Math.min(99, Math.floor(Number(value) || 1)));
 
 function cartReducer(state, action) {
   switch (action.type) {
@@ -17,12 +20,12 @@ function cartReducer(state, action) {
           ...state,
           items: state.items.map((i) =>
             i.productId === existing.productId && JSON.stringify(i.specs) === JSON.stringify(existing.specs)
-              ? { ...i, quantity: i.quantity + action.quantity }
+              ? { ...i, quantity: clampQuantity(i.quantity + action.quantity) }
               : i
           ),
         };
       }
-      return { ...state, items: [...state.items, { ...action, quantity: action.quantity || 1 }] };
+      return { ...state, items: [...state.items, { ...action, quantity: clampQuantity(action.quantity) }] };
     }
     case 'REMOVE_ITEM':
       return { ...state, items: state.items.filter((i) => i.cartId !== action.cartId) };
@@ -30,7 +33,7 @@ function cartReducer(state, action) {
       return {
         ...state,
         items: state.items.map((i) =>
-          i.cartId === action.cartId ? { ...i, quantity: Math.max(1, action.quantity) } : i
+          i.cartId === action.cartId ? { ...i, quantity: clampQuantity(action.quantity) } : i
         ),
       };
     case 'CLEAR_CART':
@@ -40,7 +43,7 @@ function cartReducer(state, action) {
     case 'SYNC_CATALOG':
       return {
         ...state,
-        items: state.items.map((item) => {
+        items: state.items.filter((item) => action.products.some((candidate) => String(candidate.id) === String(item.productId))).map((item) => {
           const product = action.products.find((candidate) => String(candidate.id) === String(item.productId));
           if (!product) return item;
           const specs = sanitizeProductSpecs(product, item.specs || {});
@@ -102,7 +105,7 @@ export function CartProvider({ children }) {
       price: getProductPrice(product, selectedSpecs),
       image: getProductImages(product, selectedSpecs)[0] || product.image,
       specs: selectedSpecs,
-      quantity,
+      quantity: clampQuantity(quantity),
     });
     setIsOpen(true);
   };

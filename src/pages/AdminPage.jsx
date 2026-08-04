@@ -297,6 +297,7 @@ export default function AdminPage() {
   const [editor, setEditor] = useState(null);
   const [query, setQuery] = useState('');
   const [error, setError] = useState('');
+  const [telegramTest, setTelegramTest] = useState({ loading: false, message: '' });
   const load = async () => {
     try { setSnapshot(await api('/admin/snapshot')); setAuth(true); setError(''); }
     catch (e) { if (/авторизац/i.test(e.message)) setAuth(false); else setError(e.message); }
@@ -315,6 +316,15 @@ export default function AdminPage() {
     catch (e) { setError(e.message); }
   };
   const logout = async () => { await api('/auth/logout', { method: 'POST' }); setAuth(false); };
+  const testTelegram = async () => {
+    setTelegramTest({ loading: true, message: '' });
+    try {
+      await api('/admin/telegram-test', { method: 'POST' });
+      setTelegramTest({ loading: false, message: 'Проверочное сообщение отправлено в Telegram' });
+    } catch (telegramError) {
+      setTelegramTest({ loading: false, message: telegramError.message });
+    }
+  };
   return <div className="max-w-7xl mx-auto px-4 py-8">
     <Seo title="Админ-панель MacLuck" noindex />
     <div className="flex items-center justify-between mb-6">
@@ -322,9 +332,15 @@ export default function AdminPage() {
       <button onClick={logout} className="border rounded-lg px-4 py-2">Выйти</button>
     </div>
     {error && <p className="bg-red-50 text-red-700 p-3 rounded-lg mb-4">{error}</p>}
-    {snapshot?.system && <p className={`p-3 rounded-lg mb-4 text-sm ${snapshot.system.telegramConfigured ? 'bg-green-50 text-green-800' : 'bg-amber-50 text-amber-900'}`}>
-      Telegram-уведомления: {snapshot.system.telegramConfigured ? 'настроены' : 'не настроены — добавьте TELEGRAM_BOT_TOKEN и TELEGRAM_CHAT_ID в переменные Timeweb'}
-    </p>}
+    {snapshot?.system && <div className={`p-3 rounded-lg mb-4 text-sm ${snapshot.system.telegramConfigured ? 'bg-green-50 text-green-800' : 'bg-amber-50 text-amber-900'}`}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <span>Telegram-уведомления: {snapshot.system.telegramConfigured ? 'настроены' : 'не настроены — добавьте TELEGRAM_BOT_TOKEN и TELEGRAM_CHAT_ID в переменные Timeweb'}</span>
+        {snapshot.system.telegramConfigured && <button type="button" onClick={testTelegram} disabled={telegramTest.loading} className="px-3 py-1.5 rounded-lg bg-white border border-green-200 font-medium disabled:opacity-60">
+          {telegramTest.loading ? 'Отправляем…' : 'Отправить тест'}
+        </button>}
+      </div>
+      {telegramTest.message && <p className="mt-2 font-medium" role="status">{telegramTest.message}</p>}
+    </div>}
     {snapshot?.system?.persistentStorage === false && <p className="p-3 rounded-lg mb-4 text-sm bg-red-50 text-red-800">
       Постоянное хранилище не подключено: изменения каталога, изображения и заказы могут исчезнуть после нового деплоя.
     </p>}

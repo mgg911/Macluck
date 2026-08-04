@@ -297,10 +297,21 @@ function validateAdminRecord(collection, value, currentId = null) {
   return value;
 }
 
-async function telegram(order) {
+async function sendTelegramText(text) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;
   if (!token || !chatId) return { sent: false, reason: 'not_configured' };
+  const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ chat_id: chatId, text }),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!response.ok) throw Object.assign(new Error(`Telegram вернул ошибку ${response.status}`), { status: 502 });
+  return { sent: true };
+}
+
+async function telegram(order) {
   const lines = [
     `Новый заказ ${order.number}`,
     `Клиент: ${order.customer.name} ${order.customer.surname || ''}`.trim(),
@@ -309,17 +320,11 @@ async function telegram(order) {
     `Адрес: ${order.customer.address || order.customer.pickupAddress || ''}`,
     `Сумма: ${order.total.toLocaleString('ru-RU')} ₽`,
     ...order.items.map(i => {
-      const specs = Object.values(i.specs || {}).filter(Boolean).join(", ");
-      return `• ${i.name}${specs ? ` (${specs})` : ""} × ${i.quantity} — ${(i.price * i.quantity).toLocaleString("ru-RU")} ₽`;
+      const specs = Object.values(i.specs || {}).filter(Boolean).join(', ');
+      return `• ${i.name}${specs ? ` (${specs})` : ''} × ${i.quantity} — ${(i.price * i.quantity).toLocaleString('ru-RU')} ₽`;
     }),
   ];
-  const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ chat_id: chatId, text: lines.join('\n') }),
-  });
-  if (!response.ok) throw new Error(`Telegram ${response.status}`);
-  return { sent: true };
+  return sendTelegramText(lines.join('\n'));
 }
 
 function isAllowedOrigin(req) {
@@ -342,7 +347,11 @@ async function route(req, res) {
   if (req.method !== 'GET' && !isAllowedOrigin(req)) {
     return json(res, 403, { error: 'Недопустимый источник запроса' });
   }
-  if (path === '/api/health') return json(res, 200, { ok: true });
+  if (path === '/api/health') return json(res, 200, {
+    ok: true,
+    telegramConfigured: Boolean(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID),
+    persistentStorage: !usingTemporaryStorage,
+  });
   if (path === '/robots.txt') {
     const base = db.settings.seo.publicUrl;
     res.writeHead(200, responseHeaders({ 'content-type': 'text/plain; charset=utf-8' }));
@@ -445,6 +454,11 @@ async function route(req, res) {
         persistentStorage: !usingTemporaryStorage,
       },
     });
+  }
+  if (path === '/api/admin/telegram-test' && req.method === 'POST') {
+    const result = await sendTelegramText('MacLuck: Telegram-уведомления подключены. Это проверочное сообщение.');
+    if (!result.sent) return json(res, 503, { error: 'Telegram не настроен' });
+    return json(res, 200, { ok: true });
   }
   if (path === '/api/admin/settings' && req.method === 'PUT') {
     const updates = cleanRecord(await body(req));

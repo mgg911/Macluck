@@ -4,6 +4,7 @@ import { createReadStream } from 'node:fs';
 import { resolve, extname, join, normalize, sep } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomBytes, scryptSync, timingSafeEqual, randomUUID } from 'node:crypto';
+import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { products, categories, banners } from '../src/data/products.js';
 import { news } from '../src/data/news.js';
 import { getProductImages, getProductPrice, sanitizeProductSpecs } from '../src/utils/productVariants.js';
@@ -16,12 +17,29 @@ if (process.env.NODE_ENV !== 'production') {
   allowedOrigins.add('http://localhost:5173');
   allowedOrigins.add('http://127.0.0.1:5173');
 }
+const s3Config = {
+  endpoint: process.env.S3_ENDPOINT || 'https://s3.twcstorage.ru',
+  region: process.env.S3_REGION || 'ru-1',
+  bucket: process.env.S3_BUCKET || '',
+  accessKeyId: process.env.S3_ACCESS_KEY || '',
+  secretAccessKey: process.env.S3_SECRET_KEY || '',
+  databaseKey: process.env.S3_DATABASE_KEY || 'macluck/database.json',
+  uploadPrefix: String(process.env.S3_UPLOAD_PREFIX || 'macluck/uploads/').replace(/^\/+|\/+$/g, '') + '/',
+};
+const s3Configured = Boolean(s3Config.bucket && s3Config.accessKeyId && s3Config.secretAccessKey);
+const s3 = s3Configured ? new S3Client({
+  endpoint: s3Config.endpoint,
+  region: s3Config.region,
+  forcePathStyle: true,
+  credentials: { accessKeyId: s3Config.accessKeyId, secretAccessKey: s3Config.secretAccessKey },
+}) : null;
 let DATA_FILE = resolve(process.env.DATA_FILE || './data/database.json');
 let UPLOAD_DIR = resolve(process.env.UPLOAD_DIR || './uploads');
 let usingTemporaryStorage = false;
 const DIST_DIR = resolve('./dist');
 const sessions = new Map();
 const attempts = new Map();
+let saveQueue = Promise.resolve();
 const operatorDetailsHtml = `<h2>Данные оператора</h2>
 <div class="company-details">
   <div class="company-details-wide"><span>Индивидуальный предприниматель</span><strong>Ли Александр Андреевич</strong></div>
@@ -214,17 +232,21 @@ const defaultSettings = {
   delivery: deliveryContent,
 };
 
-try {
-  await mkdir(resolve(DATA_FILE, '..'), { recursive: true });
-  await mkdir(UPLOAD_DIR, { recursive: true });
-} catch (error) {
-  if (error?.code !== 'EACCES' || process.env.DATA_FILE || process.env.UPLOAD_DIR) throw error;
-  usingTemporaryStorage = true;
-  const writableRoot = join(tmpdir(), 'macluck');
-  DATA_FILE = join(writableRoot, 'database.json');
-  UPLOAD_DIR = join(writableRoot, 'uploads');
-  await mkdir(UPLOAD_DIR, { recursive: true });
-  console.warn(`Read-only application directory detected; using temporary storage at ${writableRoot}`);
+if (!s3Configured) {
+  try {
+    await mkdir(resolve(DATA_FILE, '..'), { recursive: true });
+    await mkdir(UPLOAD_DIR, { recursive: true });
+  } catch (error) {
+    if (error?.code !== 'EACCES' || process.env.DATA_FILE || process.env.UPLOAD_DIR) throw error;
+    usingTemporaryStorage = true;
+    const writableRoot = join(tmpdir(), 'macluck');
+    DATA_FILE = join(writableRoot, 'database.json');
+    UPLOAD_DIR = join(writableRoot, 'uploads');
+    await mkdir(UPLOAD_DIR, { recursive: true });
+    console.warn(`Read-only application directory detected; using temporary storage at ${writableRoot}`);
+  }
+} else {
+  console.info(`Persistent S3 storage enabled for bucket ${s3Config.bucket}`);
 }
 let db = await loadDatabase();
 if (Number(db.settings?.contentVersion || 0) < defaultSettings.contentVersion) {
@@ -277,30 +299,123 @@ function requireRead(path) {
   return process.getBuiltinModule('fs').readFileSync(path, 'utf8');
 }
 
+function createInitialDatabase() {
+  return {
+    products, categories, banners, news,
+    filters: [],
+    orders: [],
+    legal: legalDefaults.map(([slug, title, content]) => ({
+      id: slug, slug, title,
+      content,
+      seoTitle: title, seoDescription: '',
+    })),
+    settings: defaultSettings,
+  };
+}
+
+function isMissingS3Object(error) {
+  return error?.name === 'NoSuchKey' || error?.name === 'NotFound' || error?.$metadata?.httpStatusCode === 404;
+}
+
+async function s3BodyToString(body) {
+  if (!body) return '';
+  if (typeof body.transformToString === 'function') return body.transformToString();
+  const chunks = [];
+  for await (const chunk of body) chunks.push(Buffer.from(chunk));
+  return Buffer.concat(chunks).toString('utf8');
+}
+
+async function persistSerializedDatabase(serialized) {
+  if (s3Configured) {
+    await s3.send(new PutObjectCommand({
+      Bucket: s3Config.bucket,
+      Key: s3Config.databaseKey,
+      Body: serialized,
+      ContentType: 'application/json; charset=utf-8',
+      CacheControl: 'no-store',
+    }));
+    return;
+  }
+  const tmp = `${DATA_FILE}.tmp`;
+  await writeFile(tmp, serialized);
+  await process.getBuiltinModule('fs/promises').rename(tmp, DATA_FILE);
+}
+
 async function loadDatabase() {
+  if (s3Configured) {
+    try {
+      const response = await s3.send(new GetObjectCommand({ Bucket: s3Config.bucket, Key: s3Config.databaseKey }));
+      return JSON.parse(await s3BodyToString(response.Body));
+    } catch (error) {
+      if (!isMissingS3Object(error)) throw error;
+      const initial = createInitialDatabase();
+      await persistSerializedDatabase(JSON.stringify(initial, null, 2));
+      return initial;
+    }
+  }
   try {
     return JSON.parse(await readFile(DATA_FILE, 'utf8'));
   } catch {
-    const initial = {
-      products, categories, banners, news,
-      filters: [],
-      orders: [],
-      legal: legalDefaults.map(([slug, title, content]) => ({
-        id: slug, slug, title,
-        content,
-        seoTitle: title, seoDescription: '',
-      })),
-      settings: defaultSettings,
-    };
-    await writeFile(DATA_FILE, JSON.stringify(initial, null, 2));
+    const initial = createInitialDatabase();
+    await persistSerializedDatabase(JSON.stringify(initial, null, 2));
     return initial;
   }
 }
 
-async function save() {
-  const tmp = `${DATA_FILE}.tmp`;
-  await writeFile(tmp, JSON.stringify(db, null, 2));
-  await process.getBuiltinModule('fs/promises').rename(tmp, DATA_FILE);
+function save() {
+  const serialized = JSON.stringify(db, null, 2);
+  const operation = saveQueue.catch(() => {}).then(() => persistSerializedDatabase(serialized));
+  saveQueue = operation;
+  return operation;
+}
+
+function persistentStorageEnabled() {
+  return s3Configured || !usingTemporaryStorage;
+}
+
+function storageMode() {
+  return s3Configured ? 's3' : usingTemporaryStorage ? 'temporary' : 'local';
+}
+
+async function storeUpload(name, mimeType, buffer) {
+  if (s3Configured) {
+    await s3.send(new PutObjectCommand({
+      Bucket: s3Config.bucket,
+      Key: s3Config.uploadPrefix + name,
+      Body: buffer,
+      ContentType: mimeType,
+      CacheControl: 'public, max-age=31536000, immutable',
+    }));
+    return;
+  }
+  await writeFile(join(UPLOAD_DIR, name), buffer);
+}
+
+async function deleteUpload(name) {
+  if (s3Configured) {
+    await s3.send(new DeleteObjectCommand({ Bucket: s3Config.bucket, Key: s3Config.uploadPrefix + name }));
+    return;
+  }
+  await unlink(join(UPLOAD_DIR, name)).catch(() => {});
+}
+
+async function serveS3Upload(path, res) {
+  const name = path.slice('/uploads/'.length);
+  if (!/^[a-zA-Z0-9._-]+$/.test(name)) return json(res, 404, { error: 'Not found' });
+  try {
+    const response = await s3.send(new GetObjectCommand({ Bucket: s3Config.bucket, Key: s3Config.uploadPrefix + name }));
+    const types = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp' };
+    res.writeHead(200, responseHeaders({
+      'content-type': response.ContentType || types[extname(name).toLowerCase()] || 'application/octet-stream',
+      'cache-control': response.CacheControl || 'public, max-age=31536000, immutable',
+      ...(response.ETag ? { etag: response.ETag } : {}),
+    }));
+    if (typeof response.Body?.pipe === 'function') response.Body.pipe(res);
+    else res.end(Buffer.from(await response.Body.transformToByteArray()));
+  } catch (error) {
+    if (isMissingS3Object(error)) return json(res, 404, { error: 'Not found' });
+    throw error;
+  }
 }
 
 function responseHeaders(extra = {}) {
@@ -473,7 +588,8 @@ async function route(req, res) {
   if (path === '/api/health') return json(res, 200, {
     ok: true,
     telegramConfigured: Boolean(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID),
-    persistentStorage: !usingTemporaryStorage,
+    persistentStorage: persistentStorageEnabled(),
+    storageMode: storageMode(),
   });
   if (path === '/robots.txt') {
     const base = db.settings.seo.publicUrl;
@@ -574,7 +690,8 @@ async function route(req, res) {
       ...db,
       system: {
         telegramConfigured: Boolean(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID),
-        persistentStorage: !usingTemporaryStorage,
+        persistentStorage: persistentStorageEnabled(),
+    storageMode: storageMode(),
       },
     });
   }
@@ -594,15 +711,15 @@ async function route(req, res) {
     if (!match) return json(res, 400, { error: 'Разрешены только PNG, JPEG и WEBP' });
     const ext = { 'image/png': '.png', 'image/jpeg': '.jpg', 'image/webp': '.webp' }[match[1]];
     const name = `${randomUUID()}${ext}`;
-    await writeFile(join(UPLOAD_DIR, name), Buffer.from(match[2], 'base64'));
+    await storeUpload(name, match[1], Buffer.from(match[2], 'base64'));
     return json(res, 201, { url: `/uploads/${name}` });
   }
   if (path === '/api/admin/upload' && req.method === 'DELETE') {
     const data = await body(req);
     if (!String(data.url || '').startsWith('/uploads/')) return json(res, 400, { error: 'Можно удалить только загруженный файл' });
-    const target = normalize(join(UPLOAD_DIR, data.url.slice(9)));
-    if (target !== UPLOAD_DIR && !target.startsWith(UPLOAD_DIR + sep)) return json(res, 403, { error: 'Недопустимый путь' });
-    await unlink(target).catch(() => {});
+    const name = data.url.slice(9);
+    if (!/^[a-zA-Z0-9._-]+$/.test(name)) return json(res, 403, { error: 'Недопустимый путь' });
+    await deleteUpload(name);
     return json(res, 200, { ok: true });
   }
   const match = path.match(/^\/api\/admin\/(products|categories|filters|news|banners|legal|orders)(?:\/([^/]+))?$/);
@@ -665,6 +782,7 @@ function isKnownPage(path) {
 }
 
 async function serveStatic(path, res) {
+  if (s3Configured && path.startsWith('/uploads/')) return serveS3Upload(path, res);
   const upload = path.startsWith('/uploads/');
   const root = upload ? UPLOAD_DIR : DIST_DIR;
   let target = normalize(join(root, upload ? path.slice(9) : path === '/' ? 'index.html' : path.slice(1)));

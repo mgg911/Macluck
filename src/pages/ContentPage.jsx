@@ -48,10 +48,10 @@ const pageMeta = {
   },
 };
 
-export default function ContentPage({ type }) {
+export default function ContentPage({ type, legalSlug }) {
   const { slug } = useParams();
   const { data, error } = useSite();
-  const key = type || slug;
+  const key = type || legalSlug || slug;
   const fixedPage = fixed[key];
   const legal = data?.legal?.find((item) => item.slug === key);
   const title = fixedPage?.[0] || legal?.title || 'Документ';

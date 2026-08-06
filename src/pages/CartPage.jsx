@@ -255,13 +255,15 @@ export default function CartPage() {
                 <input
                   type="checkbox"
                   checked={consent}
+                  required
+                  aria-required="true"
                   onChange={(e) => setConsent(e.target.checked)}
                   className="mt-0.5 w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
                 />
                 <span className="text-xs text-gray-500 leading-relaxed group-hover:text-gray-700 transition">
-                  Я согласен на{' '}
-                  <Link to="/legal/consent" className="text-brand-600 hover:underline" onClick={(e) => e.stopPropagation()}>
-                    обработку персональных данных
+                  Я соглашаюсь с{' '}
+                  <Link to="/privacy" target="_blank" rel="noopener noreferrer" className="text-brand-600 hover:underline" onClick={(e) => e.stopPropagation()}>
+                    Политикой обработки персональных данных
                   </Link>
                 </span>
               </label>

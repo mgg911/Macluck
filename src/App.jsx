@@ -47,6 +47,10 @@ export default function App() {
                   <Route path="/admin/*" element={<AdminPage />} />
                   <Route path="/about" element={<ContentPage type="about" />} />
                   <Route path="/delivery" element={<ContentPage type="delivery" />} />
+                  <Route path="/privacy" element={<ContentPage legalSlug="privacy" />} />
+                  <Route path="/terms" element={<ContentPage legalSlug="terms" />} />
+                  <Route path="/cookies" element={<ContentPage legalSlug="cookies" />} />
+                  <Route path="/consent" element={<ContentPage legalSlug="consent" />} />
                   <Route path="/legal/:slug" element={<ContentPage />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>

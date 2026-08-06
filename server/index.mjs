@@ -22,13 +22,116 @@ let usingTemporaryStorage = false;
 const DIST_DIR = resolve('./dist');
 const sessions = new Map();
 const attempts = new Map();
-const legalDefaults = [
-  ['privacy', 'Политика обработки персональных данных'],
-  ['consent', 'Согласие на обработку персональных данных'],
-  ['terms', 'Пользовательское соглашение'],
-  ['sales', 'Условия продажи, возврата и гарантии'],
-];
+const operatorDetailsHtml = `<h2>Данные оператора</h2>
+<div class="company-details">
+  <div class="company-details-wide"><span>Индивидуальный предприниматель</span><strong>Ли Александр Андреевич</strong></div>
+  <div><span>ИНН</span><strong>590800775583</strong></div>
+  <div><span>ОГРНИП</span><strong>322665800215742</strong></div>
+  <div class="company-details-wide"><span>Адрес</span><strong>Чеченская Республика, Курчалоевский район, с.п. Регитинское, с. Регита, ул. Ахъядова, д. 4</strong></div>
+  <div><span>Email</span><strong><a href="mailto:macluck@yandex.ru">macluck@yandex.ru</a></strong></div>
+  <div><span>Телефон</span><strong><a href="tel:+79194802324">+7 (919) 480-23-24</a></strong></div>
+  <div class="company-details-wide"><span>Домен</span><strong><a href="https://macluck.ru">macluck.ru</a></strong></div>
+</div>`;
 
+const privacyContent = `<h1>Политика обработки персональных данных</h1>
+${operatorDetailsHtml}
+<h2>1. Общие положения</h2>
+<p>Настоящая Политика обработки персональных данных определяет порядок обработки и защиты персональных данных пользователей сайта <a href="https://macluck.ru">https://macluck.ru</a>.</p>
+<p>Оператором персональных данных является ИП Ли Александр Андреевич.</p>
+<p>Политика разработана в соответствии с Федеральным законом РФ №152-ФЗ «О персональных данных».</p>
+<h2>2. Какие данные собираются</h2>
+<p>При оформлении заказа Пользователь предоставляет:</p>
+<ul>
+  <li>имя;</li>
+  <li>номер телефона;</li>
+  <li>адрес доставки.</li>
+</ul>
+<p>Также хостинг-провайдер может автоматически фиксировать техническую информацию:</p>
+<ul>
+  <li>IP-адрес;</li>
+  <li>сведения о браузере;</li>
+  <li>дату и время обращения к сайту.</li>
+</ul>
+<h2>3. Цели обработки</h2>
+<p>Персональные данные обрабатываются исключительно для:</p>
+<ul>
+  <li>оформления заказа;</li>
+  <li>связи с покупателем;</li>
+  <li>организации доставки товара;</li>
+  <li>исполнения обязательств по договору купли-продажи.</li>
+</ul>
+<h2>4. Правовые основания обработки</h2>
+<p>Основанием обработки является:</p>
+<ul>
+  <li>добровольное согласие Пользователя;</li>
+  <li>необходимость исполнения договора купли-продажи.</li>
+</ul>
+<h2>5. Передача данных</h2>
+<p>Оператор не передает персональные данные третьим лицам, за исключением случаев, предусмотренных законодательством РФ, либо когда такая передача необходима для доставки товара.</p>
+<h2>6. Срок хранения</h2>
+<p>Данные хранятся не дольше срока, необходимого для исполнения заказа и выполнения требований законодательства РФ о бухгалтерском и налоговом учете.</p>
+<h2>7. Права пользователя</h2>
+<p>Пользователь вправе:</p>
+<ul>
+  <li>запросить информацию о своих данных;</li>
+  <li>потребовать их уточнения;</li>
+  <li>потребовать удаления данных;</li>
+  <li>отозвать согласие на обработку.</li>
+</ul>
+<p>Запрос направляется на <a href="mailto:macluck@yandex.ru">macluck@yandex.ru</a>.</p>
+<h2>8. Защита данных</h2>
+<p>Оператор принимает необходимые организационные и технические меры для защиты персональных данных от неправомерного доступа, изменения, раскрытия или уничтожения.</p>
+<h2>9. Контакты</h2>
+<p>По всем вопросам обработки персональных данных:</p>
+<p>Email: <a href="mailto:macluck@yandex.ru">macluck@yandex.ru</a><br>Телефон: <a href="tel:+79194802324">+7 (919) 480-23-24</a></p>`;
+
+const termsContent = `<h1>Пользовательское соглашение</h1>
+<h2>1. Общие положения</h2>
+<p>Настоящее Соглашение регулирует использование сайта <a href="https://macluck.ru">https://macluck.ru</a>.</p>
+<p>Используя сайт, Пользователь подтверждает согласие с условиями настоящего Соглашения.</p>
+<h2>2. Предмет соглашения</h2>
+<p>Сайт предоставляет информацию о товарах и возможность оформить заказ на приобретение техники и аксессуаров.</p>
+<h2>3. Обязанности пользователя</h2>
+<p>Пользователь обязуется:</p>
+<ul>
+  <li>указывать достоверные данные при оформлении заказа;</li>
+  <li>не использовать сайт в противоправных целях;</li>
+  <li>не предпринимать действий, нарушающих работу сайта.</li>
+</ul>
+<h2>4. Ответственность</h2>
+<p>Оператор не несет ответственности за:</p>
+<ul>
+  <li>временную недоступность сайта;</li>
+  <li>ошибки, вызванные действиями третьих лиц;</li>
+  <li>невозможность использования сайта по причинам, не зависящим от Оператора.</li>
+</ul>
+<h2>5. Интеллектуальная собственность</h2>
+<p>Все материалы сайта, включая логотип, изображения, тексты и элементы дизайна, принадлежат Macluck либо используются на законных основаниях.</p>
+<h2>6. Заключительные положения</h2>
+<p>Оператор вправе изменять настоящее Соглашение без предварительного уведомления. Актуальная версия всегда размещается на сайте.</p>`;
+
+const cookiesContent = `<h1>Политика использования Cookie</h1>
+<p>Сайт macluck.ru использует технические файлы cookie, необходимые для корректной работы сайта и обеспечения безопасности.</p>
+<p>Cookie могут использоваться для:</p>
+<ul>
+  <li>сохранения пользовательских настроек;</li>
+  <li>обеспечения корректной работы корзины и форм;</li>
+  <li>ведения технических журналов хостинга.</li>
+</ul>
+<p>Продолжая использовать сайт, Пользователь соглашается с использованием файлов cookie.</p>
+<p>Пользователь может отключить cookie в настройках своего браузера, однако это может повлиять на работоспособность отдельных функций сайта.</p>`;
+
+const consentContent = `<h1>Согласие на обработку персональных данных</h1>
+<h2>Текст согласия</h2>
+<p>Нажимая кнопку «Оформить заказ», я подтверждаю, что ознакомлен(а) с Политикой обработки персональных данных и даю согласие ИП Ли Александру Андреевичу на обработку моих персональных данных (имя, номер телефона, адрес доставки) в целях оформления и исполнения заказа.</p>`;
+
+const legalDefaults = [
+  ['privacy', 'Политика обработки персональных данных', privacyContent],
+  ['consent', 'Согласие на обработку персональных данных', consentContent],
+  ['terms', 'Пользовательское соглашение', termsContent],
+  ['cookies', 'Политика использования Cookie', cookiesContent],
+  ['sales', 'Условия продажи, возврата и гарантии', '<h1>Условия продажи, возврата и гарантии</h1>'],
+];
 const aboutContent = `<h1>О компании Macluck</h1>
 <p><strong>Техника, которой можно доверять. Люди, на которых можно положиться.</strong></p>
 <p>Уже более 5 лет команда Macluck помогает людям покупать современную технику легко, безопасно и с уверенностью. За это время мы пришли к простому выводу: главное в нашей работе — не количество продаж, а доверие клиентов.</p>
@@ -53,10 +156,15 @@ const aboutContent = `<h1>О компании Macluck</h1>
 <p>Мы хотим, чтобы покупка техники вызывала только положительные эмоции.</p>
 <p>Наша цель — создать магазин, в который возвращаются снова и снова не только благодаря выгодным ценам, но и благодаря честному отношению, высокому уровню сервиса и уверенности в качестве каждого устройства.</p>
 <p>Macluck — это место, где современные технологии сочетаются с настоящей заботой о клиентах. Мы ценим ваше доверие и ежедневно работаем над тем, чтобы оправдывать его на все 100%.</p>
-<h2>Данные об ИП</h2>
+<h2>Данные оператора</h2>
 <div class="company-details">
+  <div class="company-details-wide"><span>Индивидуальный предприниматель</span><strong>Ли Александр Андреевич</strong></div>
   <div><span>ИНН</span><strong>590800775583</strong></div>
   <div><span>ОГРНИП</span><strong>322665800215742</strong></div>
+  <div class="company-details-wide"><span>Адрес</span><strong>Чеченская Республика, Курчалоевский район, с.п. Регитинское, с. Регита, ул. Ахъядова, д. 4</strong></div>
+  <div><span>Email</span><strong>macluck@yandex.ru</strong></div>
+  <div><span>Телефон</span><strong>+7 (919) 480-23-24</strong></div>
+  <div><span>Домен</span><strong>macluck.ru</strong></div>
   <div><span>Дата регистрации</span><strong>16 ноября 2022 года</strong></div>
   <div><span>Регион регистрации</span><strong>Чеченская Республика</strong><small>Зарегистрирован налоговым органом в Чечне</small></div>
   <div class="company-details-wide"><span>Основной вид деятельности</span><strong>Торговля розничная по почте или по информационно-коммуникационной сети Интернет</strong><small>Код ОКВЭД 47.91</small></div>
@@ -78,22 +186,24 @@ const deliveryContent = `<h1>Оплата и доставка</h1>
 <p>Возврат возможен в течение 14 дней.</p>`;
 
 const defaultSettings = {
-  contentVersion: 6,
+  contentVersion: 7,
   siteName: 'MacLuck',
   logo: '/images/macluck-logo.png',
   favicon: '/images/macluck-logo.png',
-  phone: '',
-  email: 'macluck.store@yandex.ru',
-  address: '',
+  phone: '+7 (919) 480-23-24',
+  email: 'macluck@yandex.ru',
+  address: 'Чеченская Республика, Курчалоевский район, с.п. Регитинское, с. Регита, ул. Ахъядова, д. 4',
   hours: '',
   social: { telegram: 'https://t.me/macluckru', vk: 'https://vk.ru/macluck.store', whatsapp: '' },
   business: {
+    operatorName: 'Ли Александр Андреевич',
     inn: '590800775583',
     ogrnip: '322665800215742',
     registrationDate: '16 ноября 2022 года',
     registrationRegion: 'Чеченская Республика',
     activity: 'Торговля розничная по почте или по информационно-коммуникационной сети Интернет',
     okved: '47.91',
+    domain: 'macluck.ru',
   },
   seo: {
     title: 'MacLuck — оригинальная техника и аксессуары',
@@ -125,8 +235,8 @@ if (Number(db.settings?.contentVersion || 0) < defaultSettings.contentVersion) {
     logo: defaultSettings.logo,
     favicon: defaultSettings.favicon,
     email: defaultSettings.email,
-    phone: /^\[.*\]$/.test(db.settings?.phone || '') ? '' : (db.settings?.phone || ''),
-    address: /^\[.*\]$/.test(db.settings?.address || '') ? '' : (db.settings?.address || ''),
+    phone: defaultSettings.phone,
+    address: defaultSettings.address,
     hours: /^\[.*\]$/.test(db.settings?.hours || '') ? '' : (db.settings?.hours || ''),
     social: { ...db.settings?.social, ...defaultSettings.social },
     business: defaultSettings.business,
@@ -134,9 +244,22 @@ if (Number(db.settings?.contentVersion || 0) < defaultSettings.contentVersion) {
     about: defaultSettings.about,
     delivery: defaultSettings.delivery,
   };
-  db.legal = (db.legal || []).map((item) =>
-    String(item.content || '').includes('[УКАЖИТЕ') ? { ...item, content: `<h1>${item.title}</h1>` } : item
-  );
+  const currentLegal = new Map((db.legal || []).map((item) => [item.slug, item]));
+  const managedLegalDefaults = legalDefaults.filter(([slug]) => slug !== 'sales');
+  const managedLegalSlugs = new Set(managedLegalDefaults.map(([slug]) => slug));
+  db.legal = [
+    ...managedLegalDefaults.map(([slug, title, content]) => ({
+      ...currentLegal.get(slug),
+      id: currentLegal.get(slug)?.id || slug,
+      slug,
+      title,
+      content,
+      seoTitle: title,
+      seoDescription: currentLegal.get(slug)?.seoDescription || '',
+      published: true,
+    })),
+    ...(db.legal || []).filter((item) => !managedLegalSlugs.has(item.slug)),
+  ];
   await save();
 }
 
@@ -162,9 +285,9 @@ async function loadDatabase() {
       products, categories, banners, news,
       filters: [],
       orders: [],
-      legal: legalDefaults.map(([slug, title]) => ({
+      legal: legalDefaults.map(([slug, title, content]) => ({
         id: slug, slug, title,
-        content: `<h1>${title}</h1>`,
+        content,
         seoTitle: title, seoDescription: '',
       })),
       settings: defaultSettings,
@@ -360,14 +483,14 @@ async function route(req, res) {
   if (path === '/sitemap.xml') {
     const base = db.settings.seo.publicUrl.replace(/\/$/, '');
     const paths = [...new Set([
-      '', '/catalog', '/news', '/about', '/delivery', '/clearance',
+      '', '/catalog', '/news', '/about', '/delivery', '/clearance', '/privacy', '/terms', '/cookies', '/consent',
       ...db.categories.filter(item => item.published !== false).flatMap(category => [
         `/brand/${encodeURIComponent(category.slug || category.name)}`,
         ...(category.children || []).filter(item => item.published !== false).map(child => `/brand/${encodeURIComponent(child.slug || child.name)}`),
       ]),
       ...db.products.filter(item => item.published !== false).map(product => `/product/${encodeURIComponent(product.slug || product.id)}`),
       ...db.news.filter(item => item.published !== false).map(article => `/news/${encodeURIComponent(article.slug || article.id)}`),
-      ...db.legal.filter(item => item.published !== false).map(document => `/legal/${encodeURIComponent(document.slug)}`),
+      ...db.legal.filter(item => item.published !== false && !['privacy', 'terms', 'cookies', 'consent'].includes(item.slug)).map(document => `/legal/${encodeURIComponent(document.slug)}`),
     ])];
     res.writeHead(200, responseHeaders({ 'content-type': 'application/xml; charset=utf-8' }));
     return res.end(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${paths.map(p => `<url><loc>${base}${p}</loc></url>`).join('')}</urlset>`);
@@ -553,7 +676,7 @@ async function serveStatic(path, res) {
   } catch {
     if (!upload) {
       target = join(DIST_DIR, 'index.html');
-      const knownStatic = ['/', '/catalog', '/news', '/about', '/delivery', '/cart', '/search', '/favorites', '/clearance'];
+      const knownStatic = ['/', '/catalog', '/news', '/about', '/delivery', '/cart', '/search', '/favorites', '/clearance', '/privacy', '/terms', '/cookies', '/consent'];
       statusCode = knownStatic.includes(path) || isKnownPage(path) ? 200 : 404;
     }
   }

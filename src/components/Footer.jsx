@@ -16,7 +16,7 @@ export default function Footer() {
   const settings = data?.settings || {};
   const socialLinks = Object.entries(settings.social || {})
     .map(([name, value]) => [name, safeExternalUrl(value)])
-    .filter(([, url]) => url);
+    .filter(([name, url]) => name !== 'telegram' && url);
   return (
     <footer className="bg-gray-900 text-gray-300 mt-16">
       <div className="max-w-7xl mx-auto px-4 py-12 grid grid-cols-1 md:grid-cols-2 gap-8">

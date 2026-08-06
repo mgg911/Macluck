@@ -4,6 +4,7 @@ import { ChevronRight, Search, X } from 'lucide-react';
 import ProductCard from '../components/ProductCard';
 import { useCatalog } from '../context/CatalogContext';
 import Seo from '../components/Seo';
+import CategoryIcon from '../components/CategoryIcon';
 
 export default function BrandPage() {
   const { brand, subcategory } = useParams();
@@ -99,9 +100,7 @@ export default function BrandPage() {
 
       <div className="flex items-center gap-3 mb-5">
         {category && (
-          <div className="w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center">
-            <span className="text-xl font-bold text-brand-600">{category.name[0]}</span>
-          </div>
+          <CategoryIcon category={category} className="w-12 h-12 shrink-0" />
         )}
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900">{category?.name || brand}</h1>

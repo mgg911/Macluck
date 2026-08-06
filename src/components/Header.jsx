@@ -226,7 +226,7 @@ export default function Header() {
             <Truck size={14} className="text-brand-400" />
             Доставка по всей России
           </span>
-          <span className="hidden md:inline text-gray-400">Бесплатная доставка по Москве до 3 часов</span>
+          <span className="hidden md:inline text-gray-400">Бесплатно доставим по Москве за 3 часа</span>
         </div>
       </div>
 

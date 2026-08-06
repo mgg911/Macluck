@@ -10,7 +10,7 @@ const sections = [
 
 const templates = {
   products: { name: '', slug: '', brand: '', category: '', subcategory: '', price: 0, originalPrice: 0, image: '', images: [], description: '', inStock: true, specs: [], configurationPrices: {}, colorImages: {}, techSpecs: [], filters: {}, published: true },
-  categories: { name: '', slug: '', children: [] },
+  categories: { name: '', slug: '', logo: '', children: [] },
   filters: { name: '', slug: '', values: [] },
   news: { title: '', slug: '', summary: '', content: '', image: '', date: '', category: '', published: true, seoTitle: '', seoDescription: '' },
   banners: { title: '', subtitle: '', footer: '', image_url: '', link: '', gradient: 'from-blue-600 to-blue-900', published: true },
@@ -196,6 +196,7 @@ function Editor({ section, value, onClose, onSaved }) {
       const result = await uploadImage(file);
       const parsed = JSON.parse(text);
       if (section === 'banners') parsed.image_url = result.url;
+      else if (section === 'categories') parsed.logo = result.url;
       else parsed.image = result.url;
       setText(JSON.stringify(parsed, null, 2));
     } catch (err) { setError(err.message); }
@@ -204,11 +205,12 @@ function Editor({ section, value, onClose, onSaved }) {
   const removeImage = async () => {
     try {
       const parsed = JSON.parse(text);
-      const current = section === 'banners' ? parsed.image_url : parsed.image;
+      const current = section === 'banners' ? parsed.image_url : section === 'categories' ? parsed.logo : parsed.image;
       if (current?.startsWith('/uploads/')) {
         await api('/admin/upload', { method: 'DELETE', body: { url: current } });
       }
       if (section === 'banners') parsed.image_url = '';
+      else if (section === 'categories') parsed.logo = '';
       else parsed.image = '';
       setText(JSON.stringify(parsed, null, 2));
     } catch (err) { setError(err.message); }
@@ -241,9 +243,10 @@ function Editor({ section, value, onClose, onSaved }) {
         <p className="text-xs text-gray-500 my-2">Редактируйте JSON только если нужно изменить поля, которых нет в форме выше.</p>
         <textarea aria-label="Данные записи" value={text} onChange={e => setText(e.target.value)} className="w-full h-96 font-mono text-sm border rounded-xl p-3" />
       </details>
-      {['products', 'news', 'banners'].includes(section) && <label className="block mt-3 text-sm">
-        Загрузить изображение
+      {['products', 'categories', 'news', 'banners'].includes(section) && <label className="block mt-3 text-sm">
+        {section === 'categories' ? 'Загрузить иконку категории' : 'Загрузить изображение'}
         <input type="file" accept="image/png,image/jpeg,image/webp" onChange={upload} disabled={uploading} className="block mt-1" />
+        {section === 'categories' && <span className="block mt-1 text-xs text-gray-500">Рекомендуется квадратное изображение PNG или WebP размером 512×512 px.</span>}
         <button type="button" onClick={removeImage} className="mt-2 text-red-600">Удалить текущее изображение</button>
       </label>}
       <div className="flex justify-end gap-3 mt-5">

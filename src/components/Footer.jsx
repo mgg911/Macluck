@@ -29,7 +29,7 @@ export default function Footer() {
             </div>
             <div className="flex items-center gap-2 text-sm text-gray-400">
               <MapPin size={16} className="text-brand-400" />
-              Бесплатная доставка по Москве до 3 часов
+              Бесплатно доставим по Москве за 3 часа
             </div>
             <div className="flex items-center gap-2 text-sm text-gray-400">
               <Wallet size={16} className="text-emerald-400" />

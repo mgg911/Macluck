@@ -280,7 +280,7 @@ export default function ProductDetail() {
             </div>
             <div className="flex items-center gap-2 text-sm text-gray-600">
               <Clock size={16} className="text-brand-600" />
-              Доставка до 3 часов по Москве
+              Бесплатно по Москве за 3 часа
             </div>
           </div>
         </div>

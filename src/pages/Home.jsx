@@ -6,6 +6,7 @@ import NewsCard from '../components/NewsCard';
 import { useCatalog } from '../context/CatalogContext';
 import { useSite } from '../context/SiteContext';
 import Seo from '../components/Seo';
+import CategoryIcon from '../components/CategoryIcon';
 
 export default function Home() {
   const { products, banners, categories } = useCatalog();
@@ -53,8 +54,8 @@ export default function Home() {
             <MapPin size={20} className="text-white" />
           </div>
           <div className="min-w-0">
-            <h3 className="text-white font-bold text-sm leading-tight">Бесплатная доставка по Москве</h3>
-            <p className="text-emerald-100 text-xs mt-0.5">До 3 часов при заказе до 16:30</p>
+            <h3 className="text-white font-bold text-sm leading-tight">Бесплатно доставим по Москве</h3>
+            <p className="text-emerald-100 text-xs mt-0.5">За 3 часа</p>
           </div>
         </div>
         <div className="rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 p-4 flex items-center gap-3 shadow-sm">
@@ -79,9 +80,7 @@ export default function Home() {
                 to={`/brand/${cat.slug}`}
                 className="group bg-white rounded-2xl border border-gray-100 hover:shadow-lg transition-all p-6 flex flex-col items-center text-center w-[calc((100%-2rem)/3)] sm:w-[calc((100%-2*1rem)/3)]"
               >
-                <div className="w-16 h-16 mb-3 rounded-2xl bg-gray-50 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <span className="text-2xl font-bold text-brand-600">{cat.name[0]}</span>
-                </div>
+                <CategoryIcon category={cat} className="w-16 h-16 mb-3 group-hover:scale-110 transition-transform" />
                 <h3 className="font-bold text-gray-900">{cat.name}</h3>
                 <span className="mt-2 text-sm text-brand-600 font-medium flex items-center gap-1 group-hover:gap-2 transition-all">
                   Смотреть <ArrowRight size={14} />

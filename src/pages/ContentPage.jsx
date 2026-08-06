@@ -41,7 +41,7 @@ const pageMeta = {
     title: 'Оплата и доставка',
     subtitle: 'Прозрачные условия получения заказа в Москве и отправки техники по всей России.',
     stats: [
-      { icon: Clock3, value: 'До 3 часов', label: 'доставка по Москве' },
+      { icon: Clock3, value: 'За 3 часа', label: 'доставка по Москве' },
       { icon: Truck, value: 'Бесплатно', label: 'в пределах МКАД' },
       { icon: PackageCheck, value: 'СДЭК', label: 'доставка по России' },
     ],

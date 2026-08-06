@@ -124,6 +124,12 @@ try {
   assert.equal((await fetch(appBase + uploadUrl)).status, 200);
 
   const site = (await request('/api/public')).data;
+  const category = { ...site.categories[0], logo: uploadUrl };
+  result = await request(`/api/admin/categories/${encodeURIComponent(category.id)}`, {
+    method: 'PUT', headers: adminHeaders, body: JSON.stringify(category),
+  });
+  assert.equal(result.response.status, 200, result.text);
+
   result = await request('/api/orders', {
     method: 'POST',
     headers: { origin: appBase, 'content-type': 'application/json' },
@@ -143,6 +149,7 @@ try {
 
   const persistedSite = (await request('/api/public')).data;
   assert.equal(persistedSite.settings.hours, 'Проверка постоянного хранилища');
+  assert.equal(persistedSite.categories.find((item) => item.id === category.id)?.logo, uploadUrl);
   assert.equal((await fetch(appBase + uploadUrl)).status, 200);
 
   result = await request('/api/auth/login', {

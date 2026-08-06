@@ -193,8 +193,7 @@ const deliveryContent = `<h1>Оплата и доставка</h1>
 <p>Пока доступна только оплата наличными. Безналичная оплата будет добавлена позже.</p>
 <h2>Доставка</h2>
 <h3>Москва</h3>
-<p>Бесплатная курьерская доставка в пределах МКАД.</p>
-<p>Доставка до 3 часов при оформлении заказа до 16:30.</p>
+<p>Бесплатно доставим по Москве в пределах МКАД за 3 часа.</p>
 <h3>Доставка по России</h3>
 <p>Доставка по РФ осуществляется при 100% предоплате.</p>
 <p>Стоимость доставки рассчитывается по тарифам СДЭК.</p>
@@ -204,7 +203,7 @@ const deliveryContent = `<h1>Оплата и доставка</h1>
 <p>Возврат возможен в течение 14 дней.</p>`;
 
 const defaultSettings = {
-  contentVersion: 7,
+  contentVersion: 8,
   siteName: 'MacLuck',
   logo: '/images/macluck-logo.png',
   favicon: '/images/macluck-logo.png',
@@ -250,20 +249,15 @@ if (!s3Configured) {
 }
 let db = await loadDatabase();
 if (Number(db.settings?.contentVersion || 0) < defaultSettings.contentVersion) {
+  const savedSettings = db.settings || {};
   db.settings = {
     ...defaultSettings,
-    ...db.settings,
+    ...savedSettings,
     contentVersion: defaultSettings.contentVersion,
-    logo: defaultSettings.logo,
-    favicon: defaultSettings.favicon,
-    email: defaultSettings.email,
-    phone: defaultSettings.phone,
-    address: defaultSettings.address,
-    hours: /^\[.*\]$/.test(db.settings?.hours || '') ? '' : (db.settings?.hours || ''),
-    social: { ...db.settings?.social, ...defaultSettings.social },
-    business: defaultSettings.business,
-    seo: { ...db.settings?.seo, ...defaultSettings.seo },
-    about: defaultSettings.about,
+    hours: /^\[.*\]$/.test(savedSettings.hours || '') ? '' : (savedSettings.hours || ''),
+    social: { ...defaultSettings.social, ...savedSettings.social },
+    business: { ...defaultSettings.business, ...savedSettings.business },
+    seo: { ...defaultSettings.seo, ...savedSettings.seo },
     delivery: defaultSettings.delivery,
   };
   const currentLegal = new Map((db.legal || []).map((item) => [item.slug, item]));

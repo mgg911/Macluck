@@ -63,8 +63,8 @@ export default function Home() {
             <Wallet size={20} className="text-white" />
           </div>
           <div className="min-w-0">
-            <h3 className="text-white font-bold text-sm leading-tight">Оплата наличными</h3>
-            <p className="text-amber-100 text-xs mt-0.5">Безналичная оплата появится позже</p>
+            <h3 className="text-white font-bold text-sm leading-tight">Оплата при получении</h3>
+            <p className="text-amber-100 text-xs mt-0.5">Оплатите заказ при получении</p>
           </div>
         </div>
       </div>

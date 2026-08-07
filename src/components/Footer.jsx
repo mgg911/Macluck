@@ -33,7 +33,7 @@ export default function Footer() {
             </div>
             <div className="flex items-center gap-2 text-sm text-gray-400">
               <Wallet size={16} className="text-emerald-400" />
-              Оплата наличными
+              Оплата при получении
             </div>
           </div>
         </div>

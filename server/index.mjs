@@ -190,7 +190,7 @@ const aboutContent = `<h1>О компании Macluck</h1>
 
 const deliveryContent = `<h1>Оплата и доставка</h1>
 <h2>Способы оплаты</h2>
-<p>Пока доступна только оплата наличными. Безналичная оплата будет добавлена позже.</p>
+<p>Оплата заказа производится при получении.</p>
 <h2>Доставка</h2>
 <h3>Москва</h3>
 <p>Бесплатно доставим по Москве в пределах МКАД за 3 часа.</p>
@@ -203,7 +203,7 @@ const deliveryContent = `<h1>Оплата и доставка</h1>
 <p>Возврат возможен в течение 14 дней.</p>`;
 
 const defaultSettings = {
-  contentVersion: 8,
+  contentVersion: 9,
   siteName: 'MacLuck',
   logo: '/images/macluck-logo.png',
   favicon: '/images/macluck-logo.png',

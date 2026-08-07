@@ -583,7 +583,7 @@ function postTelegramMessage(token, chatId, text) {
         resolveRequest({ ok: status >= 200 && status < 300, status, payload: parsed });
       });
     });
-    request.setTimeout(12_000, () => request.destroy(Object.assign(new Error('Telegram connection timeout'), { code: 'ETIMEDOUT' })));
+    request.setTimeout(5_000, () => request.destroy(Object.assign(new Error('Telegram connection timeout'), { code: 'ETIMEDOUT' })));
     request.on('error', rejectRequest);
     request.end(payload);
   });
@@ -600,12 +600,23 @@ async function sendTelegramText(text) {
   }
 
   let response;
-  try {
-    response = await postTelegramMessage(token, chatId, text);
-  } catch (error) {
-    const code = String(error?.code || error?.cause?.code || 'CONNECTION_FAILED');
-    console.error('Telegram connection failed:', code, error?.message || error);
-    throw Object.assign(new Error(`Сервер не смог соединиться с Telegram (код ${code}). Повторите тест через несколько минут.`), { status: 502 });
+  let lastError;
+  let attempts = 0;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    attempts = attempt;
+    try {
+      response = await postTelegramMessage(token, chatId, text);
+      break;
+    } catch (error) {
+      lastError = error;
+      const code = String(error?.code || error?.cause?.code || 'CONNECTION_FAILED');
+      console.error(`Telegram connection attempt ${attempt} failed:`, code, error?.message || error);
+      if (attempt < 3) await new Promise(resolveDelay => setTimeout(resolveDelay, attempt * 700));
+    }
+  }
+  if (!response) {
+    const code = String(lastError?.code || lastError?.cause?.code || 'CONNECTION_FAILED');
+    throw Object.assign(new Error(`Сервер не смог соединиться с Telegram после 3 попыток (код ${code}). Используйте повторную отправку заказа в админ-панели.`), { status: 502 });
   }
 
   if (!response.ok) {
@@ -620,21 +631,30 @@ async function sendTelegramText(text) {
     }
     throw Object.assign(new Error(message), { status: 502 });
   }
-  return { sent: true };
+  return { sent: true, attempts, sentAt: new Date().toISOString() };
 }
 
 async function telegram(order) {
+  const deliveryLabel = order.deliveryMethod === 'cdek' ? 'СДЭК' : 'Курьер';
+  const address = order.deliveryMethod === 'cdek'
+    ? order.customer.pickupAddress
+    : [order.customer.city, order.customer.address].filter(Boolean).join(', ');
   const lines = [
-    `Новый заказ ${order.number}`,
+    '🛒 НОВЫЙ ЗАКАЗ MACLUCK',
+    '',
+    `Номер: ${order.number}`,
     `Клиент: ${order.customer.name} ${order.customer.surname || ''}`.trim(),
     `Телефон: ${order.customer.phone}`,
-    `Доставка: ${order.deliveryMethod}`,
-    `Адрес: ${order.customer.address || order.customer.pickupAddress || ''}`,
-    `Сумма: ${order.total.toLocaleString('ru-RU')} ₽`,
+    `Доставка: ${deliveryLabel}`,
+    `Адрес: ${address || 'не указан'}`,
+    '',
+    'Товары:',
     ...order.items.map(i => {
       const specs = Object.values(i.specs || {}).filter(Boolean).join(', ');
       return `• ${i.name}${specs ? ` (${specs})` : ''} × ${i.quantity} — ${(i.price * i.quantity).toLocaleString('ru-RU')} ₽`;
     }),
+    '',
+    `ИТОГО: ${order.total.toLocaleString('ru-RU')} ₽`,
   ];
   return sendTelegramText(lines.join('\n'));
 }
@@ -777,6 +797,20 @@ async function route(req, res) {
     const result = await sendTelegramText('MacLuck: Telegram-уведомления подключены. Это проверочное сообщение.');
     if (!result.sent) return json(res, 503, { error: 'Telegram не настроен' });
     return json(res, 200, { ok: true });
+  }
+  const orderTelegramMatch = path.match(/^\/api\/admin\/orders\/([^/]+)\/telegram$/);
+  if (orderTelegramMatch && req.method === 'POST') {
+    const order = db.orders.find(item => String(item.id) === decodeURIComponent(orderTelegramMatch[1]));
+    if (!order) return json(res, 404, { error: 'Заказ не найден' });
+    try {
+      order.telegram = await telegram(order);
+      await save();
+      return json(res, 200, { ok: true, telegram: order.telegram });
+    } catch (error) {
+      order.telegram = { sent: false, error: error.message, attemptedAt: new Date().toISOString() };
+      await save();
+      throw error;
+    }
   }
   if (path === '/api/admin/settings' && req.method === 'PUT') {
     const updates = cleanRecord(await body(req));

@@ -402,6 +402,7 @@ export default function AdminPage() {
   const [query, setQuery] = useState('');
   const [error, setError] = useState('');
   const [telegramTest, setTelegramTest] = useState({ loading: false, message: '' });
+  const [orderSending, setOrderSending] = useState('');
   const load = async () => {
     try { setSnapshot(await api('/admin/snapshot')); setAuth(true); setError(''); }
     catch (e) { if (/авторизац/i.test(e.message)) setAuth(false); else setError(e.message); }
@@ -427,6 +428,19 @@ export default function AdminPage() {
       setTelegramTest({ loading: false, message: 'Проверочное сообщение отправлено в Telegram' });
     } catch (telegramError) {
       setTelegramTest({ loading: false, message: telegramError.message });
+    }
+  };
+  const sendOrderTelegram = async (order) => {
+    setOrderSending(order.id);
+    setError('');
+    try {
+      await api(`/admin/orders/${encodeURIComponent(order.id)}/telegram`, { method: 'POST' });
+      setTelegramTest({ loading: false, message: `Заказ ${order.number} отправлен в Telegram` });
+      await load();
+    } catch (sendError) {
+      setError(`Заказ ${order.number}: ${sendError.message}`);
+    } finally {
+      setOrderSending('');
     }
   };
   return <div className="max-w-7xl mx-auto px-4 py-8">
@@ -467,7 +481,16 @@ export default function AdminPage() {
             <tbody>{rows.map(item => <tr key={item.id} className="border-b last:border-0">
               <td className="py-3 pr-4"><div className="font-medium">{item.name || item.title || item.number || item.slug || item.id}</div><div className="text-xs text-gray-400">{item.slug || item.createdAt || ''}</div></td>
               <td>{item.status || (item.price != null ? `${Number(item.price).toLocaleString('ru-RU')} ₽` : item.published === false ? 'Черновик' : '')}</td>
-              <td className="text-right whitespace-nowrap"><button onClick={() => setEditor(item)} className="text-brand-600 px-2 py-1">Изменить</button>{section !== 'orders' && <button onClick={() => remove(item)} className="text-red-600 px-2 py-1">Удалить</button>}</td>
+              <td className="text-right whitespace-nowrap">
+                {section === 'orders' && <button
+                  type="button"
+                  onClick={() => sendOrderTelegram(item)}
+                  disabled={orderSending === item.id}
+                  className="text-green-700 px-2 py-1 disabled:opacity-50"
+                >{orderSending === item.id ? 'Отправляем…' : 'В Telegram'}</button>}
+                <button onClick={() => setEditor(item)} className="text-brand-600 px-2 py-1">{section === 'orders' ? 'Открыть' : 'Изменить'}</button>
+                {section !== 'orders' && <button onClick={() => remove(item)} className="text-red-600 px-2 py-1">Удалить</button>}
+              </td>
             </tr>)}</tbody>
           </table></div>}
         </>}

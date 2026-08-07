@@ -537,17 +537,54 @@ function validateAdminRecord(collection, value, currentId = null) {
   return value;
 }
 
+function telegramEnvironment() {
+  return {
+    token: String(process.env.TELEGRAM_BOT_TOKEN || '').trim(),
+    chatId: String(process.env.TELEGRAM_CHAT_ID || '').trim(),
+  };
+}
+
+function maskedTelegramRecipient() {
+  const { chatId } = telegramEnvironment();
+  return chatId ? `***${chatId.slice(-4)}` : null;
+}
+
 async function sendTelegramText(text) {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
+  const { token, chatId } = telegramEnvironment();
   if (!token || !chatId) return { sent: false, reason: 'not_configured' };
-  const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ chat_id: chatId, text }),
-    signal: AbortSignal.timeout(15_000),
-  });
-  if (!response.ok) throw Object.assign(new Error(`Telegram вернул ошибку ${response.status}`), { status: 502 });
+  if (!/^\d+:[A-Za-z0-9_-]+$/.test(token)) {
+    throw Object.assign(new Error('Неверный TELEGRAM_BOT_TOKEN. Проверьте значение в Timeweb и перезапустите приложение.'), { status: 502 });
+  }
+  if (!/^-?\d+$/.test(chatId)) {
+    throw Object.assign(new Error('Неверный TELEGRAM_CHAT_ID. Укажите только числовой ID получателя и перезапустите приложение.'), { status: 502 });
+  }
+
+  let response;
+  try {
+    response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, text }),
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch (error) {
+    console.error('Telegram connection failed:', error?.message || error);
+    throw Object.assign(new Error('Не удалось подключиться к Telegram. Проверьте переменные Timeweb и повторите после перезапуска приложения.'), { status: 502 });
+  }
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    const description = String(payload.description || '').toLowerCase();
+    let message = `Telegram вернул ошибку ${response.status}`;
+    if (response.status === 401 || response.status === 404) {
+      message = 'Неверный TELEGRAM_BOT_TOKEN. Проверьте токен в Timeweb и перезапустите приложение.';
+    } else if (description.includes('chat not found')) {
+      message = 'Telegram не нашёл получателя. Проверьте TELEGRAM_CHAT_ID и убедитесь, что получатель нажал Start в боте.';
+    } else if (response.status === 403) {
+      message = 'Telegram запретил отправку. Получатель должен разблокировать бота и нажать Start.';
+    }
+    throw Object.assign(new Error(message), { status: 502 });
+  }
   return { sent: true };
 }
 
@@ -589,7 +626,7 @@ async function route(req, res) {
   }
   if (path === '/api/health') return json(res, 200, {
     ok: true,
-    telegramConfigured: Boolean(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID),
+    telegramConfigured: Boolean(telegramEnvironment().token && telegramEnvironment().chatId),
     persistentStorage: persistentStorageEnabled(),
     storageMode: storageMode(),
   });
@@ -691,7 +728,8 @@ async function route(req, res) {
     return json(res, 200, {
       ...db,
       system: {
-        telegramConfigured: Boolean(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID),
+        telegramConfigured: Boolean(telegramEnvironment().token && telegramEnvironment().chatId),
+        telegramRecipient: maskedTelegramRecipient(),
         persistentStorage: persistentStorageEnabled(),
     storageMode: storageMode(),
       },

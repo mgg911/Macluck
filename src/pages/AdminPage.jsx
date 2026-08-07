@@ -400,7 +400,9 @@ export default function AdminPage() {
     {error && <p className="bg-red-50 text-red-700 p-3 rounded-lg mb-4">{error}</p>}
     {snapshot?.system && <div className={`p-3 rounded-lg mb-4 text-sm ${snapshot.system.telegramConfigured ? 'bg-green-50 text-green-800' : 'bg-amber-50 text-amber-900'}`}>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <span>Telegram-уведомления: {snapshot.system.telegramConfigured ? 'настроены' : 'не настроены — добавьте TELEGRAM_BOT_TOKEN и TELEGRAM_CHAT_ID в переменные Timeweb'}</span>
+        <span>Telegram-уведомления: {snapshot.system.telegramConfigured
+          ? `настроены${snapshot.system.telegramRecipient ? `, получатель ${snapshot.system.telegramRecipient}` : ''}`
+          : 'не настроены — добавьте TELEGRAM_BOT_TOKEN и TELEGRAM_CHAT_ID в переменные Timeweb'}</span>
         {snapshot.system.telegramConfigured && <button type="button" onClick={testTelegram} disabled={telegramTest.loading} className="px-3 py-1.5 rounded-lg bg-white border border-green-200 font-medium disabled:opacity-60">
           {telegramTest.loading ? 'Отправляем…' : 'Отправить тест'}
         </button>}

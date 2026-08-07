@@ -45,6 +45,171 @@ function Login({ onLogin }) {
   </div>;
 }
 
+function ProductFieldsEditor({ product, onChange, categories = [] }) {
+  const update = (field, value) => onChange({ ...product, [field]: value });
+  const selectedCategory = categories.find((category) => category.slug === product.category);
+  const keyContains = (key, specName, optionValue) => {
+    try { return new URLSearchParams(String(key)).get(specName) === String(optionValue); }
+    catch { return false; }
+  };
+
+  const addSpec = (name = '') => {
+    if (name && (product.specs || []).some((spec) => spec.name === name)) return;
+    onChange({
+      ...product,
+      specs: [...(product.specs || []), { name, options: [{ label: '', value: '' }] }],
+    });
+  };
+
+  const updateSpecName = (specIndex, name) => {
+    const specs = structuredClone(product.specs || []);
+    specs[specIndex].name = name;
+    onChange({ ...product, specs });
+  };
+
+  const updateSpecOption = (specIndex, optionIndex, label) => {
+    const specs = structuredClone(product.specs || []);
+    const option = specs[specIndex].options[optionIndex];
+    const previousAutoValue = createNewsSlug(option.label);
+    option.label = label;
+    if (!option.value || option.value === previousAutoValue) option.value = createNewsSlug(label);
+    onChange({ ...product, specs });
+  };
+
+  const addSpecOption = (specIndex) => {
+    const specs = structuredClone(product.specs || []);
+    specs[specIndex].options.push({ label: '', value: '' });
+    onChange({ ...product, specs });
+  };
+
+  const removeSpecOption = (specIndex, optionIndex) => {
+    const specs = structuredClone(product.specs || []);
+    const specName = specs[specIndex].name;
+    const [removed] = specs[specIndex].options.splice(optionIndex, 1);
+    const next = { ...product, specs };
+    if (next.configurationPrices?.[specName]) {
+      next.configurationPrices = structuredClone(next.configurationPrices);
+      delete next.configurationPrices[specName][removed.value];
+    }
+    if (next.variantPrices) {
+      next.variantPrices = Object.fromEntries(Object.entries(next.variantPrices).filter(([key]) => !keyContains(key, specName, removed.value)));
+    }
+    if (Array.isArray(next.unavailableVariants)) {
+      next.unavailableVariants = next.unavailableVariants.filter((key) => !keyContains(key, specName, removed.value));
+    }
+    if (specName === 'Цвет' && next.colorImages) {
+      next.colorImages = { ...next.colorImages };
+      delete next.colorImages[removed.value];
+    }
+    onChange(next);
+  };
+
+  const removeSpec = (specIndex) => {
+    const specs = structuredClone(product.specs || []);
+    const [removed] = specs.splice(specIndex, 1);
+    const next = { ...product, specs };
+    if (removed?.name && next.configurationPrices?.[removed.name]) {
+      next.configurationPrices = { ...next.configurationPrices };
+      delete next.configurationPrices[removed.name];
+    }
+    if (removed?.name && next.variantPrices) {
+      next.variantPrices = Object.fromEntries(Object.entries(next.variantPrices).filter(([key]) => {
+        try { return !new URLSearchParams(String(key)).has(removed.name); }
+        catch { return true; }
+      }));
+    }
+    if (removed?.name && Array.isArray(next.unavailableVariants)) {
+      next.unavailableVariants = next.unavailableVariants.filter((key) => {
+        try { return !new URLSearchParams(String(key)).has(removed.name); }
+        catch { return true; }
+      });
+    }
+    if (removed?.name === 'Цвет') next.colorImages = {};
+    onChange(next);
+  };
+
+  return <div className="space-y-5 mb-5">
+    <section className="border rounded-xl p-4 bg-gray-50">
+      <h3 className="font-semibold text-lg">Основная информация</h3>
+      <p className="text-sm text-gray-500 mt-1 mb-4">Заполните обычные поля. Код редактировать не требуется.</p>
+      <div className="grid sm:grid-cols-2 gap-4">
+        <label className="text-sm font-medium sm:col-span-2">Название товара <span className="text-red-600">*</span>
+          <input value={product.name || ''} onChange={(event) => update('name', event.target.value)} placeholder="Например, iPhone 17" className="mt-1 w-full border rounded-lg px-3 py-2 font-normal" />
+        </label>
+        <label className="text-sm font-medium">Адрес страницы
+          <input value={product.slug || ''} onChange={(event) => update('slug', createNewsSlug(event.target.value))} placeholder="Создастся из названия" className="mt-1 w-full border rounded-lg px-3 py-2 font-normal" />
+        </label>
+        <label className="text-sm font-medium">Бренд
+          <input value={product.brand || ''} onChange={(event) => update('brand', event.target.value)} placeholder="Apple" className="mt-1 w-full border rounded-lg px-3 py-2 font-normal" />
+        </label>
+        <label className="text-sm font-medium">Категория
+          <select
+            value={product.category || ''}
+            onChange={(event) => {
+              const category = categories.find((item) => item.slug === event.target.value);
+              onChange({ ...product, category: event.target.value, brand: product.brand || category?.name || '', subcategory: '' });
+            }}
+            className="mt-1 w-full border rounded-lg px-3 py-2 bg-white font-normal"
+          >
+            <option value="">Выберите категорию</option>
+            {categories.map((category) => <option key={category.id || category.slug} value={category.slug}>{category.name}</option>)}
+          </select>
+        </label>
+        <label className="text-sm font-medium">Подкатегория
+          <select value={product.subcategory || ''} onChange={(event) => update('subcategory', event.target.value)} className="mt-1 w-full border rounded-lg px-3 py-2 bg-white font-normal">
+            <option value="">Выберите подкатегорию</option>
+            {(selectedCategory?.children || []).map((child) => <option key={child.id || child.slug} value={child.name}>{child.name}</option>)}
+          </select>
+        </label>
+        <label className="text-sm font-medium">Основная цена, ₽ <span className="text-red-600">*</span>
+          <input type="number" min="0" step="1" value={product.price ?? ''} onChange={(event) => update('price', event.target.value === '' ? '' : Number(event.target.value))} className="mt-1 w-full border rounded-lg px-3 py-2 font-normal" />
+        </label>
+        <label className="text-sm font-medium">Старая цена, ₽
+          <input type="number" min="0" step="1" value={product.originalPrice ?? ''} onChange={(event) => update('originalPrice', event.target.value === '' ? 0 : Number(event.target.value))} className="mt-1 w-full border rounded-lg px-3 py-2 font-normal" />
+        </label>
+        <label className="text-sm font-medium sm:col-span-2">Описание
+          <textarea rows="4" value={product.description || ''} onChange={(event) => update('description', event.target.value)} placeholder="Краткое описание товара" className="mt-1 w-full border rounded-lg px-3 py-2 font-normal" />
+        </label>
+      </div>
+      <div className="flex flex-wrap gap-4 mt-4 text-sm">
+        <label className="flex items-center gap-2"><input type="checkbox" checked={product.inStock !== false} onChange={(event) => update('inStock', event.target.checked)} /> Товар в наличии</label>
+        <label className="flex items-center gap-2"><input type="checkbox" checked={product.published !== false} onChange={(event) => update('published', event.target.checked)} /> Показывать на сайте</label>
+        <label className="flex items-center gap-2"><input type="checkbox" checked={Boolean(product.isNew)} onChange={(event) => update('isNew', event.target.checked)} /> Новинка</label>
+        <label className="flex items-center gap-2"><input type="checkbox" checked={Boolean(product.isClearance)} onChange={(event) => update('isClearance', event.target.checked)} /> Уценка</label>
+      </div>
+    </section>
+
+    <section className="border rounded-xl p-4 bg-gray-50">
+      <h3 className="font-semibold text-lg">Характеристики и варианты</h3>
+      <p className="text-sm text-gray-500 mt-1 mb-4">Добавьте память, SIM, цвета и другие варианты кнопками. Внутренние значения сайт сформирует сам.</p>
+      <div className="flex flex-wrap gap-2 mb-4">
+        <button type="button" onClick={() => addSpec('Память')} className="border bg-white rounded-lg px-3 py-2 text-sm">+ Память</button>
+        <button type="button" onClick={() => addSpec('SIM-конфигурация')} className="border bg-white rounded-lg px-3 py-2 text-sm">+ SIM-конфигурация</button>
+        <button type="button" onClick={() => addSpec('Цвет')} className="border bg-white rounded-lg px-3 py-2 text-sm">+ Цвет</button>
+        <button type="button" onClick={() => addSpec('')} className="border bg-white rounded-lg px-3 py-2 text-sm">+ Другая характеристика</button>
+      </div>
+      {!(product.specs || []).length ? <p className="text-sm text-amber-700">Характеристики пока не добавлены.</p> : <div className="space-y-4">
+        {(product.specs || []).map((spec, specIndex) => <div key={`${spec.name}-${specIndex}`} className="bg-white border rounded-xl p-3">
+          <div className="flex gap-2 items-end mb-3">
+            <label className="text-sm font-medium flex-1">Название характеристики
+              <input value={spec.name || ''} onChange={(event) => updateSpecName(specIndex, event.target.value)} placeholder="Например, Память" className="mt-1 w-full border rounded-lg px-3 py-2 font-normal" />
+            </label>
+            <button type="button" onClick={() => removeSpec(specIndex)} className="text-red-600 px-2 py-2">Удалить характеристику</button>
+          </div>
+          <p className="text-sm font-medium mb-2">Варианты</p>
+          <div className="space-y-2">
+            {(spec.options || []).map((option, optionIndex) => <div key={`${option.value}-${optionIndex}`} className="flex gap-2">
+              <input value={option.label || ''} onChange={(event) => updateSpecOption(specIndex, optionIndex, event.target.value)} placeholder="Например, 256 ГБ" className="min-w-0 flex-1 border rounded-lg px-3 py-2 text-sm" />
+              <button type="button" onClick={() => removeSpecOption(specIndex, optionIndex)} className="text-red-600 px-2" aria-label="Удалить вариант">Удалить</button>
+            </div>)}
+            <button type="button" onClick={() => addSpecOption(specIndex)} className="text-sm text-brand-600">+ Добавить вариант</button>
+          </div>
+        </div>)}
+      </div>}
+    </section>
+  </div>;
+}
+
 function ProductVariantEditor({ product, onChange, setError, uploading, setUploading }) {
   const priceSpecs = (product.specs || []).filter(
     (spec) => spec.name !== 'Цвет' && Array.isArray(spec.options) && spec.options.length
@@ -317,7 +482,7 @@ function ProductVariantEditor({ product, onChange, setError, uploading, setUploa
     </section>
   </div>;
 }
-function Editor({ section, value, onClose, onSaved }) {
+function Editor({ section, value, categories, onClose, onSaved }) {
   const [text, setText] = useState(JSON.stringify(value, null, 2));
   const [error, setError] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -344,6 +509,16 @@ function Editor({ section, value, onClose, onSaved }) {
   const save = async () => {
     try {
       const parsed = JSON.parse(text);
+      if (section === 'products') {
+        parsed.name = String(parsed.name || '').trim();
+        if (!parsed.name) throw new Error('Введите название товара');
+        parsed.slug = createNewsSlug(parsed.slug || parsed.name);
+        if (!parsed.slug) throw new Error('Не удалось создать адрес товара — измените название');
+        if (!Number.isFinite(Number(parsed.price)) || Number(parsed.price) < 0) throw new Error('Укажите корректную цену товара');
+        if ((parsed.specs || []).some((spec) => !String(spec.name || '').trim() || !Array.isArray(spec.options) || !spec.options.length || spec.options.some((option) => !String(option.label || '').trim()))) {
+          throw new Error('Заполните названия всех характеристик и вариантов либо удалите пустые строки');
+        }
+      }
       if (section === 'news') {
         parsed.title = String(parsed.title || '').trim();
         if (!parsed.title) throw new Error('Введите заголовок новости');
@@ -388,7 +563,7 @@ function Editor({ section, value, onClose, onSaved }) {
   return <div className="fixed inset-0 z-50 bg-black/50 p-4 grid place-items-center" role="dialog" aria-modal="true">
     <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-auto p-6">
       <h2 className="text-xl font-bold mb-3">{value.id ? 'Редактирование' : 'Новая запись'}</h2>
-      <p className="text-sm text-gray-500 mb-3">{section === 'news' ? 'Заполните поля новости. Адрес страницы создастся автоматически.' : 'Поля представлены в JSON: строки — в кавычках, списки — в квадратных скобках.'}</p>
+      <p className="text-sm text-gray-500 mb-3">{section === 'products' ? 'Заполните форму ниже. Открывать или редактировать код не нужно.' : section === 'news' ? 'Заполните поля новости. Адрес страницы создастся автоматически.' : 'Поля представлены в JSON: строки — в кавычках, списки — в квадратных скобках.'}</p>
       {error && <p className="bg-red-50 text-red-700 p-3 rounded-lg mb-3">{error}</p>}
       {section === 'banners' && <label className="block mb-3 text-sm font-medium">
         Ссылка при нажатии на баннер
@@ -401,16 +576,19 @@ function Editor({ section, value, onClose, onSaved }) {
         />
         <span className="block mt-1 text-xs text-gray-500">Категория: /brand/iphone · товар: /product/iphone-17-pro-max · весь каталог: /catalog. Рекомендуемый размер баннера: 1920×640 px; важный текст и объекты размещайте по центру, чтобы они не обрезались на телефоне.</span>
       </label>}
-      {section === 'products' && parsedRecord && <ProductVariantEditor
-        product={parsedRecord}
-        onChange={updateRecord}
-        setError={setError}
-        uploading={uploading}
-        setUploading={setUploading}
-      />}
+      {section === 'products' && parsedRecord && <>
+        <ProductFieldsEditor product={parsedRecord} onChange={updateRecord} categories={categories} />
+        <ProductVariantEditor
+          product={parsedRecord}
+          onChange={updateRecord}
+          setError={setError}
+          uploading={uploading}
+          setUploading={setUploading}
+        />
+      </>}
       {section === 'news' && parsedRecord && <NewsEditor article={parsedRecord} onChange={updateRecord} />}
       <details open={!['products', 'news'].includes(section)} className="border rounded-xl p-3">
-        <summary className="font-medium cursor-pointer">{section === 'products' ? 'Основные и расширенные данные товара' : section === 'news' ? 'Дополнительные настройки (JSON)' : 'Данные записи'}</summary>
+        <summary className="font-medium cursor-pointer">{section === 'products' ? 'Для разработчика (JSON) — обычно не открывать' : section === 'news' ? 'Дополнительные настройки (JSON)' : 'Данные записи'}</summary>
         <p className="text-xs text-gray-500 my-2">Редактируйте JSON только если нужно изменить поля, которых нет в форме выше.</p>
         <textarea aria-label="Данные записи" value={text} onChange={e => setText(e.target.value)} className="w-full h-96 font-mono text-sm border rounded-xl p-3" />
       </details>
@@ -567,6 +745,6 @@ export default function AdminPage() {
         </>}
       </section>
     </div>
-    {editor && <Editor section={section} value={editor} onClose={() => setEditor(null)} onSaved={() => { setEditor(null); load(); }} />}
+    {editor && <Editor section={section} value={editor} categories={snapshot?.categories || []} onClose={() => setEditor(null)} onSaved={() => { setEditor(null); load(); }} />}
   </div>;
 }

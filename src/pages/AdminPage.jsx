@@ -70,6 +70,52 @@ function ProductVariantEditor({ product, onChange, setError, uploading, setUploa
   );
   const clone = () => JSON.parse(JSON.stringify(product));
 
+  const variantKeyContainsOption = (key, specName, optionValue) => {
+    try {
+      return new URLSearchParams(String(key)).get(specName) === String(optionValue);
+    } catch {
+      return false;
+    }
+  };
+
+  const removeSpecOption = (specName, optionValue, optionLabel) => {
+    const currentSpec = (product.specs || []).find((spec) => spec.name === specName);
+    if (!currentSpec) return;
+    if ((currentSpec.options || []).length <= 1) {
+      setError(`Нельзя удалить последний вариант характеристики «${specName}».`);
+      return;
+    }
+    if (!window.confirm(`Удалить вариант «${optionLabel}» из характеристики «${specName}»?`)) return;
+
+    const next = clone();
+    const spec = (next.specs || []).find((item) => item.name === specName);
+    spec.options = (spec.options || []).filter(
+      (option) => String(option.value) !== String(optionValue)
+    );
+
+    if (next.configurationPrices?.[specName]) {
+      delete next.configurationPrices[specName][optionValue];
+      if (!Object.keys(next.configurationPrices[specName]).length) {
+        delete next.configurationPrices[specName];
+      }
+    }
+    if (next.variantPrices) {
+      next.variantPrices = Object.fromEntries(
+        Object.entries(next.variantPrices).filter(
+          ([key]) => !variantKeyContainsOption(key, specName, optionValue)
+        )
+      );
+    }
+    if (Array.isArray(next.unavailableVariants)) {
+      next.unavailableVariants = next.unavailableVariants.filter(
+        (key) => !variantKeyContainsOption(key, specName, optionValue)
+      );
+    }
+    if (specName === 'Цвет' && next.colorImages) delete next.colorImages[optionValue];
+    setError('');
+    onChange(next);
+  };
+
   const updatePrice = (specName, optionValue, value) => {
     const next = clone();
     next.configurationPrices ||= {};
@@ -124,6 +170,31 @@ function ProductVariantEditor({ product, onChange, setError, uploading, setUploa
   };
 
   return <div className="space-y-5 mb-5">
+    <section className="border rounded-xl p-4 bg-gray-50">
+      <h3 className="font-semibold text-lg">Варианты товара</h3>
+      <p className="text-sm text-gray-500 mt-1 mb-4">
+        Здесь можно безопасно удалить несуществующий объём памяти, цвет или другой вариант. Связанные цены и настройки наличия удалятся автоматически.
+      </p>
+      <div className="space-y-4">
+        {(product.specs || []).filter((spec) => Array.isArray(spec.options) && spec.options.length).map((spec) => <div key={spec.name}>
+          <p className="font-medium mb-2">{spec.name}</p>
+          <div className="flex flex-wrap gap-2">
+            {spec.options.map((option) => <div key={option.value} className="inline-flex items-center gap-2 rounded-lg border bg-white px-3 py-2 text-sm">
+              <span>{option.label}</span>
+              <button
+                type="button"
+                onClick={() => removeSpecOption(spec.name, option.value, option.label)}
+                className="font-medium text-red-600 hover:text-red-800"
+                aria-label={`Удалить вариант ${option.label}`}
+              >
+                Удалить
+              </button>
+            </div>)}
+          </div>
+        </div>)}
+      </div>
+    </section>
+
     <section className="border rounded-xl p-4 bg-gray-50">
       <h3 className="font-semibold text-lg">Цены конфигураций</h3>
       <p className="text-sm text-gray-500 mt-1 mb-4">Укажите полную цену товара для каждого варианта. Пустое поле использует основную цену товара.</p>

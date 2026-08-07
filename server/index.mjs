@@ -1,4 +1,5 @@
 import http from 'node:http';
+import { request as httpsRequest } from 'node:https';
 import { readFile, writeFile, mkdir, stat, unlink } from 'node:fs/promises';
 import { createReadStream } from 'node:fs';
 import { resolve, extname, join, normalize, sep } from 'node:path';
@@ -556,6 +557,38 @@ function maskedTelegramRecipient() {
   return chatId ? `***${chatId.slice(-4)}` : null;
 }
 
+function postTelegramMessage(token, chatId, text) {
+  const payload = JSON.stringify({ chat_id: chatId, text });
+  return new Promise((resolveRequest, rejectRequest) => {
+    const request = httpsRequest({
+      hostname: 'api.telegram.org',
+      port: 443,
+      path: `/bot${token}/sendMessage`,
+      method: 'POST',
+      family: 4,
+      headers: {
+        'content-type': 'application/json',
+        'content-length': Buffer.byteLength(payload),
+      },
+    }, (response) => {
+      let responseBody = '';
+      response.setEncoding('utf8');
+      response.on('data', (chunk) => {
+        if (responseBody.length < 65_536) responseBody += chunk;
+      });
+      response.on('end', () => {
+        let parsed = {};
+        try { parsed = JSON.parse(responseBody); } catch { /* Telegram may return an empty error body. */ }
+        const status = Number(response.statusCode || 502);
+        resolveRequest({ ok: status >= 200 && status < 300, status, payload: parsed });
+      });
+    });
+    request.setTimeout(12_000, () => request.destroy(Object.assign(new Error('Telegram connection timeout'), { code: 'ETIMEDOUT' })));
+    request.on('error', rejectRequest);
+    request.end(payload);
+  });
+}
+
 async function sendTelegramText(text) {
   const { token, chatId } = telegramEnvironment();
   if (!token || !chatId) return { sent: false, reason: 'not_configured' };
@@ -568,20 +601,15 @@ async function sendTelegramText(text) {
 
   let response;
   try {
-    response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, text }),
-      signal: AbortSignal.timeout(15_000),
-    });
+    response = await postTelegramMessage(token, chatId, text);
   } catch (error) {
-    console.error('Telegram connection failed:', error?.message || error);
-    throw Object.assign(new Error('Не удалось подключиться к Telegram. Проверьте переменные Timeweb и повторите после перезапуска приложения.'), { status: 502 });
+    const code = String(error?.code || error?.cause?.code || 'CONNECTION_FAILED');
+    console.error('Telegram connection failed:', code, error?.message || error);
+    throw Object.assign(new Error(`Сервер не смог соединиться с Telegram (код ${code}). Повторите тест через несколько минут.`), { status: 502 });
   }
 
   if (!response.ok) {
-    const payload = await response.json().catch(() => ({}));
-    const description = String(payload.description || '').toLowerCase();
+    const description = String(response.payload?.description || '').toLowerCase();
     let message = `Telegram вернул ошибку ${response.status}`;
     if (response.status === 401 || response.status === 404) {
       message = 'Неверный TELEGRAM_BOT_TOKEN. Проверьте токен в Timeweb и перезапустите приложение.';

@@ -168,7 +168,7 @@ export default function ProductDetail() {
 
           {/* Specs selection */}
           <div className="space-y-4 mb-6">
-            {product.specs.map((spec) => (
+            {product.specs.filter((spec) => spec.name !== 'SIM-конфигурация').map((spec) => (
               <div key={spec.name}>
                 <label className="block text-sm font-medium text-gray-700 mb-2">{spec.name}</label>
                 <div className="flex flex-wrap gap-2">

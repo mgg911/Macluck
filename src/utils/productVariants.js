@@ -69,7 +69,13 @@ export function sanitizeProductSpecs(product, selectedSpecs = {}) {
     if (selected != null && allowed.has(String(selected))) result[spec.name] = String(selected);
     else if (spec.options?.[0]?.value != null) result[spec.name] = String(spec.options[0].value);
   }
-  const simOptions = product?.id ? getSimConfigForProduct(product.id) : null;
+  const productSimOptions = (product?.specs || [])
+    .find((spec) => spec.name === 'SIM-конфигурация')
+    ?.options?.map((option) => String(option.value))
+    .filter(Boolean) || [];
+  const simOptions = productSimOptions.length
+    ? productSimOptions
+    : product?.id ? getSimConfigForProduct(product.id) : null;
   if (simOptions?.length) {
     const selectedSim = String(selectedSpecs?.['SIM-конфигурация'] || '');
     result['SIM-конфигурация'] = simOptions.includes(selectedSim) ? selectedSim : simOptions[0];

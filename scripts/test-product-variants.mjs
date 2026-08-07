@@ -33,4 +33,18 @@ const sanitized = sanitizeProductSpecs(product, exactSelection);
 assert.equal(sanitized['SIM-конфигурация'], 'Dual eSIM');
 assert.equal(sanitized.Память, '256gb');
 
+const customProduct = {
+  id: 'new-product-from-admin',
+  price: 50000,
+  specs: [
+    { name: 'Память', options: [{ label: '256 ГБ', value: '256-gb' }] },
+    { name: 'SIM-конфигурация', options: [
+      { label: 'Nano-SIM + eSIM', value: 'nano-sim-esim' },
+      { label: 'Dual eSIM', value: 'dual-esim' },
+    ] },
+  ],
+};
+assert.equal(sanitizeProductSpecs(customProduct, {})['SIM-конфигурация'], 'nano-sim-esim');
+assert.equal(sanitizeProductSpecs(customProduct, { 'SIM-конфигурация': 'dual-esim' })['SIM-конфигурация'], 'dual-esim');
+
 console.log(JSON.stringify({ ok: true, exactKey, exactPrice: getProductPrice(product, exactSelection) }));

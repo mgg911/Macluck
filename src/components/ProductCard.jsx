@@ -46,7 +46,7 @@ export default function ProductCard({ product, activeColor, initialMemory }) {
   const [modalQuantity, setModalQuantity] = useState(1);
 
   // Build spec selections for the modal — all specs except color & memory (handled separately)
-  const otherSpecs = useMemo(() => productSpecs.filter((spec) => spec.name !== 'Цвет' && spec.name !== 'Память' && spec.name !== 'Объём памяти'), [productSpecs]);
+  const otherSpecs = useMemo(() => productSpecs.filter((spec) => spec.name !== 'Цвет' && spec.name !== 'Память' && spec.name !== 'Объём памяти' && spec.name !== 'SIM-конфигурация'), [productSpecs]);
   const [otherSelections, setOtherSelections] = useState(() => {
     const init = {};
     otherSpecs.forEach((s) => { init[s.name] = s.options[0]?.value; });

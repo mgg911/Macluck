@@ -9,6 +9,7 @@
     "start": "node server/index.mjs",
     "build": "vite build",
     "lint": "oxlint",
+    "test:variants": "node scripts/test-product-variants.mjs",
     "test:storage": "node scripts/smoke-s3.mjs",
     "preview": "vite preview"
   },

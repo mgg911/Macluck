@@ -513,6 +513,14 @@ function validateAdminRecord(collection, value, currentId = null) {
     if (value.colorImages != null && (typeof value.colorImages !== 'object' || Array.isArray(value.colorImages) || Object.values(value.colorImages).some(images => !Array.isArray(images)))) {
       throw Object.assign(new Error('Фотографии цветов заполнены некорректно'), { status: 400 });
     }
+    if (value.variantPrices != null && (
+      typeof value.variantPrices !== 'object' ||
+      Array.isArray(value.variantPrices) ||
+      Object.keys(value.variantPrices).length > 500 ||
+      Object.entries(value.variantPrices).some(([key, price]) => !key || key.length > 500 || !Number.isFinite(Number(price)) || Number(price) < 0)
+    )) {
+      throw Object.assign(new Error('Цены комбинаций товара заполнены некорректно'), { status: 400 });
+    }
   }
   if (collection === 'categories' && value.children != null && !Array.isArray(value.children)) {
     throw Object.assign(new Error('Подкатегории должны быть списком'), { status: 400 });

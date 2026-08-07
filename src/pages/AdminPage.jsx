@@ -3,6 +3,8 @@ import { api, uploadImage } from '../lib/api';
 import Seo from '../components/Seo';
 import NewsEditor from '../components/NewsEditor';
 import { createNewsSlug } from '../lib/news';
+import { getSimConfigForProduct } from '../data/simConfig';
+import { getProductPrice, getVariantPriceKey } from '../utils/productVariants';
 
 const sections = [
   ['products', 'Товары'], ['categories', 'Категории'], ['filters', 'Фильтры'],
@@ -11,7 +13,7 @@ const sections = [
 ];
 
 const templates = {
-  products: { name: '', slug: '', brand: '', category: '', subcategory: '', price: 0, originalPrice: 0, image: '', images: [], description: '', inStock: true, specs: [], configurationPrices: {}, colorImages: {}, techSpecs: [], filters: {}, published: true },
+  products: { name: '', slug: '', brand: '', category: '', subcategory: '', price: 0, originalPrice: 0, image: '', images: [], description: '', inStock: true, specs: [], configurationPrices: {}, variantPrices: {}, colorImages: {}, techSpecs: [], filters: {}, published: true },
   categories: { name: '', slug: '', logo: '', children: [] },
   filters: { name: '', slug: '', values: [] },
   news: { title: '', slug: '', summary: '', content: '', image: '', date: '', category: '', author: 'MacLuck', published: true, seoTitle: '', seoDescription: '' },
@@ -50,6 +52,22 @@ function ProductVariantEditor({ product, onChange, setError, uploading, setUploa
   const colorSpec = (product.specs || []).find(
     (spec) => spec.name === 'Цвет' && Array.isArray(spec.options) && spec.options.length
   );
+  const configuredSimOptions = getSimConfigForProduct(String(product.id || product.slug || '')) || [];
+  const hasSimSpec = priceSpecs.some((spec) => spec.name === 'SIM-конфигурация');
+  const variantSpecs = configuredSimOptions.length && !hasSimSpec
+    ? [...priceSpecs, {
+        name: 'SIM-конфигурация',
+        options: configuredSimOptions.map((value) => ({ label: value, value })),
+      }]
+    : priceSpecs;
+  const usesSimMatrix = variantSpecs.some((spec) => spec.name === 'SIM-конфигурация');
+  const variantCombinations = variantSpecs.reduce(
+    (combinations, spec) => combinations.flatMap((combination) => spec.options.map((option) => ({
+      selections: { ...combination.selections, [spec.name]: option.value },
+      labels: [...combination.labels, `${spec.name}: ${option.label}`],
+    }))),
+    [{ selections: {}, labels: [] }]
+  );
   const clone = () => JSON.parse(JSON.stringify(product));
 
   const updatePrice = (specName, optionValue, value) => {
@@ -58,6 +76,15 @@ function ProductVariantEditor({ product, onChange, setError, uploading, setUploa
     next.configurationPrices[specName] ||= {};
     if (value === '') delete next.configurationPrices[specName][optionValue];
     else next.configurationPrices[specName][optionValue] = Math.max(0, Number(value) || 0);
+    onChange(next);
+  };
+
+  const updateVariantPrice = (selections, value) => {
+    const next = clone();
+    const key = getVariantPriceKey(selections);
+    next.variantPrices ||= {};
+    if (value === '') delete next.variantPrices[key];
+    else next.variantPrices[key] = Math.max(0, Number(value) || 0);
     onChange(next);
   };
 
@@ -90,7 +117,31 @@ function ProductVariantEditor({ product, onChange, setError, uploading, setUploa
     <section className="border rounded-xl p-4 bg-gray-50">
       <h3 className="font-semibold text-lg">Цены конфигураций</h3>
       <p className="text-sm text-gray-500 mt-1 mb-4">Укажите полную цену товара для каждого варианта. Пустое поле использует основную цену товара.</p>
-      {!priceSpecs.length ? <p className="text-sm text-amber-700">Сначала добавьте варианты памяти или другой конфигурации в поле specs.</p> :
+      {!variantSpecs.length ? <p className="text-sm text-amber-700">Сначала добавьте варианты памяти или другой конфигурации в поле specs.</p> : usesSimMatrix ?
+        <div>
+          <p className="text-sm font-medium text-gray-700 mb-3">Точные цены по памяти и SIM</p>
+          <div className="grid md:grid-cols-2 gap-3">
+            {variantCombinations.map((combination) => {
+              const key = getVariantPriceKey(combination.selections);
+              const fallbackPrice = getProductPrice({ ...product, variantPrices: {} }, combination.selections);
+              return <label key={key} className="text-sm bg-white border rounded-xl p-3">
+                <span className="block min-h-10 text-gray-700">{combination.labels.join(' · ')}</span>
+                <div className="relative mt-1">
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={product.variantPrices?.[key] ?? ''}
+                    onChange={(event) => updateVariantPrice(combination.selections, event.target.value)}
+                    placeholder={String(fallbackPrice)}
+                    className="w-full border rounded-lg px-3 py-2 pr-8 bg-white"
+                  />
+                  <span className="absolute right-3 top-2 text-gray-400">₽</span>
+                </div>
+              </label>;
+            })}
+          </div>
+        </div> :
         <div className="space-y-4">
           {priceSpecs.map((spec) => <div key={spec.name}>
             <p className="font-medium mb-2">{spec.name}</p>

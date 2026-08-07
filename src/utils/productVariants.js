@@ -6,6 +6,14 @@ const asPrice = (value) => {
   return Number.isFinite(price) && price >= 0 ? price : null;
 };
 
+export function getVariantPriceKey(selectedSpecs = {}) {
+  return Object.entries(selectedSpecs)
+    .filter(([name, value]) => name !== 'Цвет' && value != null && String(value) !== '')
+    .sort(([first], [second]) => first < second ? -1 : first > second ? 1 : 0)
+    .map(([name, value]) => `${encodeURIComponent(name)}=${encodeURIComponent(String(value))}`)
+    .join('&');
+}
+
 export function getProductPrice(product, selectedSpecs = {}) {
   let price = asPrice(product?.price) ?? 0;
   for (const spec of product?.specs || []) {
@@ -14,6 +22,15 @@ export function getProductPrice(product, selectedSpecs = {}) {
     const configured = asPrice(product?.configurationPrices?.[spec.name]?.[selected]);
     if (configured != null) price = configured;
   }
+  const selectedSim = selectedSpecs?.['SIM-конфигурация'];
+  const configuredSim = selectedSim
+    ? asPrice(product?.configurationPrices?.['SIM-конфигурация']?.[selectedSim])
+    : null;
+  if (configuredSim != null) price = configuredSim;
+
+  const variantKey = getVariantPriceKey(selectedSpecs);
+  const exactPrice = variantKey ? asPrice(product?.variantPrices?.[variantKey]) : null;
+  if (exactPrice != null) price = exactPrice;
   return price;
 }
 

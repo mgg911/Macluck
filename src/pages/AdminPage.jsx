@@ -128,6 +128,25 @@ function ProductFieldsEditor({ product, onChange, categories = [] }) {
     onChange(next);
   };
 
+  const addTechSpec = () => {
+    onChange({
+      ...product,
+      techSpecs: [...(product.techSpecs || []), { label: '', value: '' }],
+    });
+  };
+
+  const updateTechSpec = (index, field, value) => {
+    const techSpecs = structuredClone(product.techSpecs || []);
+    techSpecs[index][field] = value;
+    onChange({ ...product, techSpecs });
+  };
+
+  const removeTechSpec = (index) => {
+    const techSpecs = structuredClone(product.techSpecs || []);
+    techSpecs.splice(index, 1);
+    onChange({ ...product, techSpecs });
+  };
+
   return <div className="space-y-5 mb-5">
     <section className="border rounded-xl p-4 bg-gray-50">
       <h3 className="font-semibold text-lg">Основная информация</h3>
@@ -206,6 +225,31 @@ function ProductFieldsEditor({ product, onChange, categories = [] }) {
           </div>
         </div>)}
       </div>}
+    </section>
+
+    <section className="border rounded-xl p-4 bg-gray-50">
+      <h3 className="font-semibold text-lg">Технические характеристики</h3>
+      <p className="text-sm text-gray-500 mt-1 mb-4">Эти строки отображаются в карточке товара в таблице «Характеристики».</p>
+      {!(product.techSpecs || []).length ? <p className="text-sm text-amber-700 mb-3">Технические характеристики пока не добавлены.</p> : <div className="space-y-2 mb-3">
+        {(product.techSpecs || []).map((spec, index) => <div key={index} className="grid sm:grid-cols-[1fr_1.5fr_auto] gap-2 items-center">
+          <input
+            value={spec.label || ''}
+            onChange={(event) => updateTechSpec(index, 'label', event.target.value)}
+            placeholder="Название, например Дисплей"
+            aria-label={`Название технической характеристики ${index + 1}`}
+            className="min-w-0 border rounded-lg px-3 py-2 text-sm bg-white"
+          />
+          <input
+            value={spec.value || ''}
+            onChange={(event) => updateTechSpec(index, 'value', event.target.value)}
+            placeholder="Значение, например 6,3 дюйма OLED"
+            aria-label={`Значение технической характеристики ${index + 1}`}
+            className="min-w-0 border rounded-lg px-3 py-2 text-sm bg-white"
+          />
+          <button type="button" onClick={() => removeTechSpec(index)} className="text-red-600 px-2 py-2">Удалить</button>
+        </div>)}
+      </div>}
+      <button type="button" onClick={addTechSpec} className="border bg-white rounded-lg px-3 py-2 text-sm text-brand-600">+ Добавить характеристику</button>
     </section>
   </div>;
 }
@@ -517,6 +561,9 @@ function Editor({ section, value, categories, onClose, onSaved }) {
         if (!Number.isFinite(Number(parsed.price)) || Number(parsed.price) < 0) throw new Error('Укажите корректную цену товара');
         if ((parsed.specs || []).some((spec) => !String(spec.name || '').trim() || !Array.isArray(spec.options) || !spec.options.length || spec.options.some((option) => !String(option.label || '').trim()))) {
           throw new Error('Заполните названия всех характеристик и вариантов либо удалите пустые строки');
+        }
+        if ((parsed.techSpecs || []).some((spec) => !String(spec.label || '').trim() || !String(spec.value || '').trim())) {
+          throw new Error('Заполните название и значение каждой технической характеристики либо удалите пустую строку');
         }
       }
       if (section === 'news') {

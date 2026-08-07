@@ -8,7 +8,7 @@ import { colorMap } from '../data/products';
 import SimConfigurator from '../components/SimConfigurator';
 import ProductCard from '../components/ProductCard';
 import Seo from '../components/Seo';
-import { getProductImages, getProductPrice, sanitizeProductSpecs } from '../utils/productVariants';
+import { getProductImages, getProductPrice, isProductVariantAvailable, sanitizeProductSpecs } from '../utils/productVariants';
 
 export default function ProductDetail() {
   const { id } = useParams();
@@ -47,6 +47,7 @@ export default function ProductDetail() {
     [product, effectiveSpecs]
   );
   const currentPrice = getProductPrice(product, effectiveSpecs);
+  const currentAvailable = isProductVariantAvailable(product, effectiveSpecs);
   const productId = product?.id;
   const selectedColor = effectiveSpecs['Цвет'];
 
@@ -78,6 +79,7 @@ export default function ProductDetail() {
   const formatPrice = (p) => (p ?? 0).toLocaleString('ru-RU') + ' ₽';
 
   const handleAddToCart = () => {
+    if (!currentAvailable) return;
     addToCart(product, effectiveSpecs, quantity);
   };
 
@@ -91,7 +93,7 @@ export default function ProductDetail() {
         title={product.seoTitle || `${product.name} — купить в MacLuck`}
         description={product.seoDescription || product.description}
         image={galleryImages[0] || product.image}
-        schema={{ '@context': 'https://schema.org', '@type': 'Product', name: product.name, image: galleryImages, description: product.description, offers: { '@type': 'Offer', priceCurrency: 'RUB', price: currentPrice, availability: 'https://schema.org/InStock' } }}
+        schema={{ '@context': 'https://schema.org', '@type': 'Product', name: product.name, image: galleryImages, description: product.description, offers: { '@type': 'Offer', priceCurrency: 'RUB', price: currentPrice, availability: currentAvailable ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock' } }}
       />
       {/* Breadcrumbs */}
       <nav className="flex items-center gap-1 text-sm text-gray-500 mb-6 flex-wrap">
@@ -212,6 +214,7 @@ export default function ProductDetail() {
               product={product}
               selectedSim={selectedSim}
               onChange={setSelectedSim}
+              selectedSpecs={effectiveSpecs}
             />
           </div>
 
@@ -248,11 +251,11 @@ export default function ProductDetail() {
             <div className="flex gap-3">
               <button
                 onClick={handleAddToCart}
-                disabled={!allSelected || !product.inStock}
+                disabled={!allSelected || !currentAvailable}
                 className="flex-1 flex items-center justify-center gap-2 bg-brand-600 text-white font-medium py-3 rounded-xl hover:bg-brand-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <ShoppingCart size={18} />
-                {product.inStock ? 'Добавить в корзину' : 'Нет в наличии'}
+                {currentAvailable ? 'Добавить в корзину' : 'Нет в наличии'}
               </button>
               <button
                 onClick={() => toggleFavorite(product, effectiveSpecs)}

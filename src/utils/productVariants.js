@@ -14,6 +14,22 @@ export function getVariantPriceKey(selectedSpecs = {}) {
     .join('&');
 }
 
+export function isProductVariantAvailable(product, selectedSpecs = {}) {
+  if (product?.inStock === false) return false;
+  const unavailable = new Set(
+    Array.isArray(product?.unavailableVariants) ? product.unavailableVariants.map(String) : []
+  );
+  if (!unavailable.size) return true;
+
+  const entries = Object.entries(selectedSpecs)
+    .filter(([name, value]) => name !== 'Цвет' && value != null && String(value) !== '');
+  const keys = [
+    getVariantPriceKey(Object.fromEntries(entries)),
+    ...entries.map(([name, value]) => getVariantPriceKey({ [name]: value })),
+  ].filter(Boolean);
+  return !keys.some((key) => unavailable.has(key));
+}
+
 export function getProductPrice(product, selectedSpecs = {}) {
   let price = asPrice(product?.price) ?? 0;
   for (const spec of product?.specs || []) {

@@ -13,7 +13,7 @@ const sections = [
 ];
 
 const templates = {
-  products: { name: '', slug: '', brand: '', category: '', subcategory: '', price: 0, originalPrice: 0, image: '', images: [], description: '', inStock: true, specs: [], configurationPrices: {}, variantPrices: {}, colorImages: {}, techSpecs: [], filters: {}, published: true },
+  products: { name: '', slug: '', brand: '', category: '', subcategory: '', price: 0, originalPrice: 0, image: '', images: [], description: '', inStock: true, specs: [], configurationPrices: {}, variantPrices: {}, unavailableVariants: [], colorImages: {}, techSpecs: [], filters: {}, published: true },
   categories: { name: '', slug: '', logo: '', children: [] },
   filters: { name: '', slug: '', values: [] },
   news: { title: '', slug: '', summary: '', content: '', image: '', date: '', category: '', author: 'MacLuck', published: true, seoTitle: '', seoDescription: '' },
@@ -88,6 +88,16 @@ function ProductVariantEditor({ product, onChange, setError, uploading, setUploa
     onChange(next);
   };
 
+  const updateVariantAvailability = (selections, available) => {
+    const next = clone();
+    const key = getVariantPriceKey(selections);
+    const unavailable = new Set(Array.isArray(next.unavailableVariants) ? next.unavailableVariants : []);
+    if (available) unavailable.delete(key);
+    else unavailable.add(key);
+    next.unavailableVariants = [...unavailable];
+    onChange(next);
+  };
+
   const setColorImages = (color, images) => {
     const next = clone();
     next.colorImages ||= {};
@@ -124,7 +134,8 @@ function ProductVariantEditor({ product, onChange, setError, uploading, setUploa
             {variantCombinations.map((combination) => {
               const key = getVariantPriceKey(combination.selections);
               const fallbackPrice = getProductPrice({ ...product, variantPrices: {} }, combination.selections);
-              return <label key={key} className="text-sm bg-white border rounded-xl p-3">
+              const available = !product.unavailableVariants?.includes(key);
+              return <div key={key} className={`text-sm bg-white border rounded-xl p-3 ${available ? '' : 'border-red-200 bg-red-50/40'}`}>
                 <span className="block min-h-10 text-gray-700">{combination.labels.join(' · ')}</span>
                 <div className="relative mt-1">
                   <input
@@ -138,7 +149,18 @@ function ProductVariantEditor({ product, onChange, setError, uploading, setUploa
                   />
                   <span className="absolute right-3 top-2 text-gray-400">₽</span>
                 </div>
-              </label>;
+                <label className="mt-3 flex items-center gap-2 font-medium cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={available}
+                    onChange={(event) => updateVariantAvailability(combination.selections, event.target.checked)}
+                    className="h-4 w-4 accent-blue-600"
+                  />
+                  <span className={available ? 'text-green-700' : 'text-red-700'}>
+                    {available ? 'Доступно к заказу' : 'Нет в наличии'}
+                  </span>
+                </label>
+              </div>;
             })}
           </div>
         </div> :
@@ -146,9 +168,13 @@ function ProductVariantEditor({ product, onChange, setError, uploading, setUploa
           {priceSpecs.map((spec) => <div key={spec.name}>
             <p className="font-medium mb-2">{spec.name}</p>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {spec.options.map((option) => <label key={option.value} className="text-sm">
-                {option.label}
-                <div className="relative mt-1">
+              {spec.options.map((option) => {
+                const selections = { [spec.name]: option.value };
+                const key = getVariantPriceKey(selections);
+                const available = !product.unavailableVariants?.includes(key);
+                return <div key={option.value} className={`text-sm border rounded-xl p-3 ${available ? 'bg-white' : 'border-red-200 bg-red-50/40'}`}>
+                  {option.label}
+                  <div className="relative mt-1">
                   <input
                     type="number"
                     min="0"
@@ -159,8 +185,20 @@ function ProductVariantEditor({ product, onChange, setError, uploading, setUploa
                     className="w-full border rounded-lg px-3 py-2 pr-8 bg-white"
                   />
                   <span className="absolute right-3 top-2 text-gray-400">₽</span>
-                </div>
-              </label>)}
+                  </div>
+                  <label className="mt-3 flex items-center gap-2 font-medium cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={available}
+                      onChange={(event) => updateVariantAvailability(selections, event.target.checked)}
+                      className="h-4 w-4 accent-blue-600"
+                    />
+                    <span className={available ? 'text-green-700' : 'text-red-700'}>
+                      {available ? 'Доступно к заказу' : 'Нет в наличии'}
+                    </span>
+                  </label>
+                </div>;
+              })}
             </div>
           </div>)}
         </div>}

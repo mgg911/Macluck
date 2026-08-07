@@ -5,7 +5,7 @@ import { useFavorites } from '../context/FavoritesContext';
 import { useCart } from '../context/CartContext';
 import { colorMap } from '../data/products';
 import SimConfigurator from './SimConfigurator';
-import { getProductImages, getProductPrice, sanitizeProductSpecs } from '../utils/productVariants';
+import { getProductImages, getProductPrice, isProductVariantAvailable, sanitizeProductSpecs } from '../utils/productVariants';
 
 function getMemorySpec(specs) {
   return specs.find((spec) => spec.name === 'Память' || spec.name === 'Объём памяти');
@@ -66,6 +66,7 @@ export default function ProductCard({ product, activeColor, initialMemory }) {
     ...(selectedSim ? { 'SIM-конфигурация': selectedSim } : {}),
   }), [memorySpec, otherSelections, product, selectedColor, selectedMemory, selectedSim]);
   const currentPrice = getProductPrice(product, effectiveSpecs);
+  const currentAvailable = isProductVariantAvailable(product, effectiveSpecs);
   const currentImages = getProductImages(product, effectiveSpecs);
   const currentImage = currentImages[0] || product.image;
 
@@ -90,8 +91,7 @@ export default function ProductCard({ product, activeColor, initialMemory }) {
   };
 
   const handleConfirmAdd = () => {
-    addToCart(product, effectiveSpecs, modalQuantity);
-    setShowConfigModal(false);
+    if (addToCart(product, effectiveSpecs, modalQuantity)) setShowConfigModal(false);
   };
 
   const formatPrice = (p) => p.toLocaleString('ru-RU') + ' ₽';
@@ -210,6 +210,7 @@ export default function ProductCard({ product, activeColor, initialMemory }) {
             product={product}
             selectedSim={selectedSim}
             onChange={setSelectedSim}
+            selectedSpecs={effectiveSpecs}
             compact
           />
 
@@ -348,7 +349,14 @@ export default function ProductCard({ product, activeColor, initialMemory }) {
                 product={product}
                 selectedSim={selectedSim}
                 onChange={setSelectedSim}
+                selectedSpecs={effectiveSpecs}
               />
+
+              {!currentAvailable && (
+                <p className="rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700" role="status">
+                  Выбранной конфигурации сейчас нет в наличии
+                </p>
+              )}
 
               {/* Quantity */}
               <div>
@@ -381,9 +389,10 @@ export default function ProductCard({ product, activeColor, initialMemory }) {
               </button>
               <button
                 onClick={handleConfirmAdd}
-                className="flex-1 py-3 rounded-xl bg-brand-600 text-white font-medium hover:bg-brand-700 transition text-sm"
+                disabled={!currentAvailable}
+                className="flex-1 py-3 rounded-xl bg-brand-600 text-white font-medium hover:bg-brand-700 transition text-sm disabled:bg-gray-200 disabled:text-gray-500 disabled:cursor-not-allowed"
               >
-                Добавить {modalQuantity > 1 ? '(' + modalQuantity + ' шт.)' : ''}
+                {currentAvailable ? `Добавить${modalQuantity > 1 ? ` (${modalQuantity} шт.)` : ''}` : 'Нет в наличии'}
               </button>
             </div>
           </div>

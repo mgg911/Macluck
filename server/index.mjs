@@ -7,7 +7,7 @@ import { randomBytes, scryptSync, timingSafeEqual, randomUUID } from 'node:crypt
 import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { products, categories, banners } from '../src/data/products.js';
 import { news } from '../src/data/news.js';
-import { getProductImages, getProductPrice, sanitizeProductSpecs } from '../src/utils/productVariants.js';
+import { getProductImages, getProductPrice, isProductVariantAvailable, sanitizeProductSpecs } from '../src/utils/productVariants.js';
 
 loadEnv(resolve('.env'));
 const PORT = Number(process.env.PORT || 3001);
@@ -521,6 +521,13 @@ function validateAdminRecord(collection, value, currentId = null) {
     )) {
       throw Object.assign(new Error('Цены комбинаций товара заполнены некорректно'), { status: 400 });
     }
+    if (value.unavailableVariants != null && (
+      !Array.isArray(value.unavailableVariants) ||
+      value.unavailableVariants.length > 500 ||
+      value.unavailableVariants.some(key => typeof key !== 'string' || !key || key.length > 500)
+    )) {
+      throw Object.assign(new Error('Наличие комбинаций товара заполнено некорректно'), { status: 400 });
+    }
   }
   if (collection === 'categories' && value.children != null && !Array.isArray(value.children)) {
     throw Object.assign(new Error('Подкатегории должны быть списком'), { status: 400 });
@@ -698,6 +705,9 @@ async function route(req, res) {
       const quantity = Math.max(1, Math.min(99, Number(requested.quantity) || 1));
       if (!product) return json(res, 400, { error: 'Один из товаров больше недоступен' });
       const specs = sanitizeProductSpecs(product, requested.specs || {});
+      if (!isProductVariantAvailable(product, specs)) {
+        return json(res, 409, { error: `Конфигурации «${product.name}» сейчас нет в наличии` });
+      }
       const price = getProductPrice(product, specs);
       const image = getProductImages(product, specs)[0] || product.image;
       calculated.push({ productId: product.id, name: product.name, price, quantity, image, specs });

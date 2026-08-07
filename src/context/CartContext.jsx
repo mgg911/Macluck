@@ -1,6 +1,6 @@
 // oxlint-disable react/only-export-components
 import { createContext, useContext, useReducer, useState, useEffect } from 'react';
-import { getProductImages, getProductPrice, sanitizeProductSpecs } from '../utils/productVariants';
+import { getProductImages, getProductPrice, isProductVariantAvailable, sanitizeProductSpecs } from '../utils/productVariants';
 import { useCatalog } from './CatalogContext';
 
 const STORAGE_KEY = 'macluck_cart';
@@ -43,17 +43,18 @@ function cartReducer(state, action) {
     case 'SYNC_CATALOG':
       return {
         ...state,
-        items: state.items.filter((item) => action.products.some((candidate) => String(candidate.id) === String(item.productId))).map((item) => {
+        items: state.items.flatMap((item) => {
           const product = action.products.find((candidate) => String(candidate.id) === String(item.productId));
-          if (!product) return item;
+          if (!product) return [];
           const specs = sanitizeProductSpecs(product, item.specs || {});
-          return {
+          if (!isProductVariantAvailable(product, specs)) return [];
+          return [{
             ...item,
             name: product.name,
             price: getProductPrice(product, specs),
             image: getProductImages(product, specs)[0] || product.image,
             specs,
-          };
+          }];
         }),
       };
     default:
@@ -96,6 +97,7 @@ export function CartProvider({ children }) {
 
   const addToCart = (product, specs, quantity = 1) => {
     const selectedSpecs = sanitizeProductSpecs(product, specs);
+    if (!isProductVariantAvailable(product, selectedSpecs)) return false;
     const cartId = `${product.id}-${Date.now()}`;
     dispatch({
       type: 'ADD_ITEM',
@@ -108,6 +110,7 @@ export function CartProvider({ children }) {
       quantity: clampQuantity(quantity),
     });
     setIsOpen(true);
+    return true;
   };
 
   const removeFromCart = (cartId) => dispatch({ type: 'REMOVE_ITEM', cartId });

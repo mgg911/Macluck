@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api, uploadImage } from '../lib/api';
 import Seo from '../components/Seo';
+import NewsEditor from '../components/NewsEditor';
+import { createNewsSlug } from '../lib/news';
 
 const sections = [
   ['products', 'Товары'], ['categories', 'Категории'], ['filters', 'Фильтры'],
@@ -12,7 +14,7 @@ const templates = {
   products: { name: '', slug: '', brand: '', category: '', subcategory: '', price: 0, originalPrice: 0, image: '', images: [], description: '', inStock: true, specs: [], configurationPrices: {}, colorImages: {}, techSpecs: [], filters: {}, published: true },
   categories: { name: '', slug: '', logo: '', children: [] },
   filters: { name: '', slug: '', values: [] },
-  news: { title: '', slug: '', summary: '', content: '', image: '', date: '', category: '', published: true, seoTitle: '', seoDescription: '' },
+  news: { title: '', slug: '', summary: '', content: '', image: '', date: '', category: '', author: 'MacLuck', published: true, seoTitle: '', seoDescription: '' },
   banners: { title: '', subtitle: '', footer: '', image_url: '', link: '', gradient: 'from-blue-600 to-blue-900', published: true },
   legal: { slug: '', title: '', content: '', seoTitle: '', seoDescription: '' },
 };
@@ -182,6 +184,14 @@ function Editor({ section, value, onClose, onSaved }) {
   const save = async () => {
     try {
       const parsed = JSON.parse(text);
+      if (section === 'news') {
+        parsed.title = String(parsed.title || '').trim();
+        if (!parsed.title) throw new Error('Введите заголовок новости');
+        parsed.slug = createNewsSlug(parsed.slug || parsed.title);
+        if (!parsed.slug) throw new Error('Не удалось создать адрес новости — измените заголовок');
+        if (!parsed.date) parsed.date = new Date().toISOString().slice(0, 10);
+        if (!parsed.author) parsed.author = 'MacLuck';
+      }
       const method = value.id ? 'PUT' : 'POST';
       const path = `/admin/${section}${value.id ? `/${encodeURIComponent(value.id)}` : ''}`;
       await api(path, { method, body: parsed });
@@ -218,7 +228,7 @@ function Editor({ section, value, onClose, onSaved }) {
   return <div className="fixed inset-0 z-50 bg-black/50 p-4 grid place-items-center" role="dialog" aria-modal="true">
     <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-auto p-6">
       <h2 className="text-xl font-bold mb-3">{value.id ? 'Редактирование' : 'Новая запись'}</h2>
-      <p className="text-sm text-gray-500 mb-3">Поля представлены в JSON: строки — в кавычках, списки — в квадратных скобках.</p>
+      <p className="text-sm text-gray-500 mb-3">{section === 'news' ? 'Заполните поля новости. Адрес страницы создастся автоматически.' : 'Поля представлены в JSON: строки — в кавычках, списки — в квадратных скобках.'}</p>
       {error && <p className="bg-red-50 text-red-700 p-3 rounded-lg mb-3">{error}</p>}
       {section === 'banners' && <label className="block mb-3 text-sm font-medium">
         Ссылка при нажатии на баннер
@@ -238,13 +248,14 @@ function Editor({ section, value, onClose, onSaved }) {
         uploading={uploading}
         setUploading={setUploading}
       />}
-      <details open={section !== 'products'} className="border rounded-xl p-3">
-        <summary className="font-medium cursor-pointer">{section === 'products' ? 'Основные и расширенные данные товара' : 'Данные записи'}</summary>
+      {section === 'news' && parsedRecord && <NewsEditor article={parsedRecord} onChange={updateRecord} />}
+      <details open={!['products', 'news'].includes(section)} className="border rounded-xl p-3">
+        <summary className="font-medium cursor-pointer">{section === 'products' ? 'Основные и расширенные данные товара' : section === 'news' ? 'Дополнительные настройки (JSON)' : 'Данные записи'}</summary>
         <p className="text-xs text-gray-500 my-2">Редактируйте JSON только если нужно изменить поля, которых нет в форме выше.</p>
         <textarea aria-label="Данные записи" value={text} onChange={e => setText(e.target.value)} className="w-full h-96 font-mono text-sm border rounded-xl p-3" />
       </details>
       {['products', 'categories', 'news', 'banners'].includes(section) && <label className="block mt-3 text-sm">
-        {section === 'categories' ? 'Загрузить иконку категории' : 'Загрузить изображение'}
+        {section === 'categories' ? 'Загрузить иконку категории' : section === 'news' ? 'Загрузить изображение новости' : 'Загрузить изображение'}
         <input type="file" accept="image/png,image/jpeg,image/webp" onChange={upload} disabled={uploading} className="block mt-1" />
         {section === 'categories' && <span className="block mt-1 text-xs text-gray-500">Рекомендуется квадратное изображение PNG или WebP размером 512×512 px.</span>}
         <button type="button" onClick={removeImage} className="mt-2 text-red-600">Удалить текущее изображение</button>

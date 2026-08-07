@@ -26,18 +26,23 @@ export default function BannerSlider({ banners }) {
   };
 
   return (
-    <div className="relative w-full overflow-hidden rounded-2xl shadow-lg">
-      <div className="relative aspect-[3/1] sm:aspect-[4/1] max-h-[280px] min-h-[120px]">
+    <div className="relative w-full overflow-hidden rounded-2xl shadow-lg bg-slate-900">
+      <div className="relative w-full aspect-[3/1] min-h-[120px] max-h-[430px] overflow-hidden">
         {banners.map((banner, idx) => (
           <Link
             key={banner.id}
             to={safeLink(banner.link)}
-            className={`absolute inset-0 transition-opacity duration-700 bg-gradient-to-br ${banner.gradient} ${
+            className={`absolute inset-0 block w-full h-full overflow-hidden transition-opacity duration-700 bg-slate-900 bg-gradient-to-br ${banner.gradient} ${
               idx === current ? 'opacity-100 z-10' : 'opacity-0 z-0'
             }`}
           >
             {banner.image_url && (
-              <img src={banner.image_url} alt="" className="absolute inset-0 w-full h-full object-cover" />
+              <img
+                src={banner.image_url}
+                alt=""
+                className="absolute inset-0 block w-full h-full max-w-none object-cover object-center"
+                style={{ width: '100%', height: '100%' }}
+              />
             )}
             <div
               className={`absolute right-[8%] top-1/2 -translate-y-1/2 w-32 h-32 sm:w-44 sm:h-44 rounded-full ${banner.circle_color} hidden sm:block ${banner.image_url ? 'opacity-0' : ''}`}

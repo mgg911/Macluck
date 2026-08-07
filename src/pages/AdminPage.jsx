@@ -258,6 +258,7 @@ function Editor({ section, value, onClose, onSaved }) {
         {section === 'categories' ? 'Загрузить иконку категории' : section === 'news' ? 'Загрузить изображение новости' : 'Загрузить изображение'}
         <input type="file" accept="image/png,image/jpeg,image/webp" onChange={upload} disabled={uploading} className="block mt-1" />
         {section === 'categories' && <span className="block mt-1 text-xs text-gray-500">Рекомендуется квадратное изображение PNG или WebP размером 512×512 px.</span>}
+        {section === 'banners' && <span className="block mt-1 text-xs text-gray-500">Рекомендуемый размер: 2160×720 px, пропорция 3:1. Форматы JPG, PNG или WebP.</span>}
         <button type="button" onClick={removeImage} className="mt-2 text-red-600">Удалить текущее изображение</button>
       </label>}
       <div className="flex justify-end gap-3 mt-5">
